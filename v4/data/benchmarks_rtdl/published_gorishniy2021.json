@@ -1,0 +1,345 @@
+{
+ "source": "Gorishniy, Rubachev, Khrulkov & Babenko (2021), 'Revisiting Deep Learning Models for Tabular Data', NeurIPS 2021, arXiv:2106.11959. Single-model table = one tuned model per architecture; ensemble table = ensembles of those single models; GBDT table = separately tuned XGBoost/CatBoost ensembles. No std given in the paper's main tables for this benchmark (unlike the num-embeddings paper).",
+ "datasets": {
+  "CA": {
+   "label": "California Housing",
+   "rows": 20640,
+   "n_num": 8,
+   "n_cat": 0,
+   "task": "regression",
+   "metric": "rmse",
+   "higher_better": false,
+   "splits": [
+    13209,
+    3303,
+    4128
+   ]
+  },
+  "AD": {
+   "label": "Adult",
+   "rows": 48842,
+   "n_num": 6,
+   "n_cat": 8,
+   "task": "binary",
+   "metric": "acc",
+   "higher_better": true,
+   "splits": [
+    26048,
+    6513,
+    16281
+   ]
+  },
+  "HE": {
+   "label": "Helena",
+   "rows": 65196,
+   "n_num": 27,
+   "n_cat": 0,
+   "task": "multiclass",
+   "metric": "acc",
+   "higher_better": true,
+   "splits": [
+    41724,
+    10432,
+    13040
+   ],
+   "n_classes": 100
+  },
+  "JA": {
+   "label": "Jannis",
+   "rows": 83733,
+   "n_num": 54,
+   "n_cat": 0,
+   "task": "multiclass",
+   "metric": "acc",
+   "higher_better": true,
+   "splits": [
+    53588,
+    13398,
+    16747
+   ],
+   "n_classes": 4
+  },
+  "HI": {
+   "label": "Higgs Small",
+   "rows": 98050,
+   "n_num": 28,
+   "n_cat": 0,
+   "task": "binary",
+   "metric": "acc",
+   "higher_better": true,
+   "splits": [
+    62752,
+    15688,
+    19610
+   ]
+  },
+  "AL": {
+   "label": "ALOI",
+   "rows": 108000,
+   "n_num": 128,
+   "n_cat": 0,
+   "task": "multiclass",
+   "metric": "acc",
+   "higher_better": true,
+   "splits": [
+    69120,
+    17280,
+    21600
+   ],
+   "n_classes": 1000
+  },
+  "EP": {
+   "label": "Epsilon",
+   "rows": 500000,
+   "n_num": 2000,
+   "n_cat": 0,
+   "task": "binary",
+   "metric": "acc",
+   "higher_better": true,
+   "splits": [
+    320000,
+    80000,
+    100000
+   ]
+  },
+  "YE": {
+   "label": "YearPredictionMSD",
+   "rows": 515345,
+   "n_num": 90,
+   "n_cat": 0,
+   "task": "regression",
+   "metric": "rmse",
+   "higher_better": false,
+   "splits": [
+    370972,
+    92743,
+    51630
+   ]
+  },
+  "CO": {
+   "label": "Covertype",
+   "rows": 581012,
+   "n_num": 54,
+   "n_cat": 0,
+   "task": "multiclass",
+   "metric": "acc",
+   "higher_better": true,
+   "splits": [
+    371847,
+    92962,
+    116203
+   ],
+   "n_classes": 7
+  },
+  "YA": {
+   "label": "Yahoo",
+   "rows": 709877,
+   "n_num": 699,
+   "n_cat": 0,
+   "task": "regression",
+   "metric": "rmse",
+   "higher_better": false,
+   "splits": [
+    473134,
+    71083,
+    165660
+   ]
+  },
+  "MI": {
+   "label": "Microsoft",
+   "rows": 1200192,
+   "n_num": 136,
+   "n_cat": 0,
+   "task": "regression",
+   "metric": "rmse",
+   "higher_better": false,
+   "splits": [
+    723412,
+    235259,
+    241521
+   ]
+  }
+ },
+ "single": {
+  "TabNet": {
+   "CA": 0.51,
+   "AD": 0.85,
+   "HE": 0.378,
+   "JA": 0.723,
+   "HI": 0.719,
+   "AL": 0.954,
+   "EP": 0.8896,
+   "YE": 8.909,
+   "CO": 0.957,
+   "YA": 0.823,
+   "MI": 0.751
+  },
+  "SNN": {
+   "CA": 0.493,
+   "AD": 0.854,
+   "HE": 0.373,
+   "JA": 0.719,
+   "HI": 0.722,
+   "AL": 0.954,
+   "EP": 0.8975,
+   "YE": 8.895,
+   "CO": 0.961,
+   "YA": 0.761,
+   "MI": 0.751
+  },
+  "AutoInt": {
+   "CA": 0.474,
+   "AD": 0.859,
+   "HE": 0.372,
+   "JA": 0.721,
+   "HI": 0.725,
+   "AL": 0.945,
+   "EP": 0.8949,
+   "YE": 8.882,
+   "CO": 0.934,
+   "YA": 0.768,
+   "MI": 0.75
+  },
+  "GrowNet": {
+   "CA": 0.487,
+   "AD": 0.857,
+   "HI": 0.722,
+   "EP": 0.897,
+   "YE": 8.827,
+   "YA": 0.765,
+   "MI": 0.751
+  },
+  "MLP": {
+   "CA": 0.499,
+   "AD": 0.852,
+   "HE": 0.383,
+   "JA": 0.719,
+   "HI": 0.723,
+   "AL": 0.954,
+   "EP": 0.8977,
+   "YE": 8.853,
+   "CO": 0.962,
+   "YA": 0.757,
+   "MI": 0.747
+  },
+  "DCN2": {
+   "CA": 0.484,
+   "AD": 0.853,
+   "HE": 0.385,
+   "JA": 0.716,
+   "HI": 0.723,
+   "AL": 0.955,
+   "EP": 0.8977,
+   "YE": 8.89,
+   "CO": 0.965,
+   "YA": 0.757,
+   "MI": 0.749
+  },
+  "NODE": {
+   "CA": 0.464,
+   "AD": 0.858,
+   "HE": 0.359,
+   "JA": 0.727,
+   "HI": 0.726,
+   "AL": 0.918,
+   "EP": 0.8958,
+   "YE": 8.784,
+   "CO": 0.958,
+   "YA": 0.753,
+   "MI": 0.745
+  },
+  "ResNet": {
+   "CA": 0.486,
+   "AD": 0.854,
+   "HE": 0.396,
+   "JA": 0.728,
+   "HI": 0.727,
+   "AL": 0.963,
+   "EP": 0.8969,
+   "YE": 8.846,
+   "CO": 0.964,
+   "YA": 0.757,
+   "MI": 0.748
+  },
+  "FT-Transformer": {
+   "CA": 0.459,
+   "AD": 0.859,
+   "HE": 0.391,
+   "JA": 0.732,
+   "HI": 0.729,
+   "AL": 0.96,
+   "EP": 0.8982,
+   "YE": 8.855,
+   "CO": 0.97,
+   "YA": 0.756,
+   "MI": 0.746
+  }
+ },
+ "ensemble": {
+  "NODE": {
+   "CA": 0.461,
+   "AD": 0.86,
+   "HE": 0.361,
+   "JA": 0.73,
+   "HI": 0.727,
+   "AL": 0.921,
+   "EP": 0.897,
+   "YE": 8.716,
+   "CO": 0.965,
+   "YA": 0.75,
+   "MI": 0.744
+  },
+  "ResNet": {
+   "CA": 0.478,
+   "AD": 0.857,
+   "HE": 0.398,
+   "JA": 0.734,
+   "HI": 0.731,
+   "AL": 0.966,
+   "EP": 0.8976,
+   "YE": 8.77,
+   "CO": 0.967,
+   "YA": 0.751,
+   "MI": 0.745
+  },
+  "FT-Transformer": {
+   "CA": 0.448,
+   "AD": 0.86,
+   "HE": 0.398,
+   "JA": 0.739,
+   "HI": 0.731,
+   "AL": 0.967,
+   "EP": 0.8984,
+   "YE": 8.751,
+   "CO": 0.973,
+   "YA": 0.747,
+   "MI": 0.743
+  }
+ },
+ "gbdt": {
+  "XGBoost": {
+   "CA": 0.431,
+   "AD": 0.872,
+   "HE": 0.377,
+   "JA": 0.724,
+   "HI": 0.728,
+   "EP": 0.8861,
+   "YE": 8.819,
+   "CO": 0.969,
+   "YA": 0.732,
+   "MI": 0.742
+  },
+  "CatBoost": {
+   "CA": 0.423,
+   "AD": 0.874,
+   "HE": 0.388,
+   "JA": 0.727,
+   "HI": 0.729,
+   "EP": 0.8898,
+   "YE": 8.837,
+   "CO": 0.968,
+   "YA": 0.74,
+   "MI": 0.741
+  }
+ }
+}

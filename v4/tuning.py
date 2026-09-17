@@ -38,12 +38,14 @@ from optuna.storages import JournalStorage
 from optuna.storages.journal import JournalFileBackend
 
 from attention import AttentionConfig
+from embeddings import EmbeddingConfig
 from model import PlainMLP, SRPConfig, SRPModel
 from training import evaluate, train_model
 from weak_learners import WeakLearnerConfig
 
 __all__ = ["NN_ARMS", "STEP3_DEFAULTS", "suggest_params", "build_model", "run_config",
-           "create_study", "optuna_worker", "tune_xgb", "make_xgb", "xgb_metrics"]
+           "create_study", "optuna_worker", "tune_xgb", "make_xgb", "xgb_metrics",
+           "load_study"]
 
 NN_ARMS = ("meanpool", "causal")
 
@@ -79,7 +81,27 @@ def suggest_params(trial: optuna.Trial, arm: str, k_range=(2, 64)) -> Dict:
         p["attn_depth"] = trial.suggest_int("attn_depth", 1, 3)
     else:
         raise ValueError(f"unknown arm {arm!r}; choose from {NN_ARMS}")
+
+    # Per-feature embeddings (embeddings.py) are now part of the architecture, so a real
+    # hyperparameter search has to cover them too — searching everything else with the
+    # embedding frozen at one setting would just find the best config FOR that setting.
+    p["embedding_mode"] = trial.suggest_categorical("embedding_mode", ["none", "linear", "periodic"])
+    if p["embedding_mode"] != "none":
+        p["d_embedding"] = trial.suggest_categorical("d_embedding", [4, 8, 16])
+        if p["embedding_mode"] == "periodic":
+            p["n_frequencies"] = trial.suggest_categorical("n_frequencies", [8, 16, 32])
+            p["sigma"] = trial.suggest_float("sigma", 0.01, 1.0, log=True)
     return p
+
+
+def _embedding_config(params: Dict) -> EmbeddingConfig:
+    mode = params.get("embedding_mode", "none")
+    if mode == "none":
+        return EmbeddingConfig(mode="none")
+    kw = dict(mode=mode, d_embedding=params["d_embedding"])
+    if mode == "periodic":
+        kw.update(n_frequencies=params["n_frequencies"], sigma=params["sigma"])
+    return EmbeddingConfig(**kw)
 
 
 def build_model(arm: str, params: Dict, in_dim: int, seed: int, task: str = "regression",
@@ -90,17 +112,18 @@ def build_model(arm: str, params: Dict, in_dim: int, seed: int, task: str = "reg
                             dropout=params["dropout"], feature_frac=params["feature_frac"],
                             seed=seed, batched=batched)
     torch.manual_seed(seed)
+    emb = _embedding_config(params)
     if arm == "meanpool":
         cfg = SRPConfig(aggregator="meanpool", head_hidden=params["head_hidden"],
                         head_depth=params["head_depth"], head_dropout=params["dropout"],
-                        task=task, output_dim=output_dim)
+                        task=task, output_dim=output_dim, embedding=emb)
         return SRPModel(in_dim, ens, None, cfg)
     if arm == "causal":
         att = AttentionConfig(embed_dim=params["embed_dim"], num_heads=params["num_heads"],
                               attn_depth=params["attn_depth"], dropout=params["dropout"],
                               need_weights=False)
         cfg = SRPConfig(aggregator="causal", readout="last", head_dropout=params["dropout"],
-                        task=task, output_dim=output_dim)
+                        task=task, output_dim=output_dim, embedding=emb)
         return SRPModel(in_dim, ens, att, cfg)
     raise ValueError(f"unknown arm {arm!r}; choose from {NN_ARMS}")
 

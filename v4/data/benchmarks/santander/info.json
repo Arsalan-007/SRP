@@ -1,0 +1,10 @@
+{
+    "name": "Santander Customer Transactions",
+    "id": "santander--default",
+    "task_type": "binclass",
+    "n_num_features": 200,
+    "n_cat_features": 0,
+    "train_size": 128000,
+    "val_size": 32000,
+    "test_size": 40000
+}

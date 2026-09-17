@@ -1,0 +1,20 @@
+__pycache__/
+*.pyc
+
+# Dataset payloads (kept locally / distributed separately, not in git).
+# Small metadata files (info.json, archive_listing.txt) are still tracked.
+v4/data/**/*.npy
+v4/data/**/*.npz
+v4/data/**/*.tar
+v4/data/**/*.gz
+
+# Ephemeral run artifacts
+v4/runs/*.log
+v4/runs/*.journal
+
+# Duplicate of the tracked tabjoint_vishal_averaged_experiments/ folder
+tabjoint_vishal_averaged_experiments.zip
+
+# Editor/tool worktree scratch directory
+.kilo/
+

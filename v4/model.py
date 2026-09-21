@@ -30,6 +30,7 @@ import torch.nn.functional as F
 from weak_learners import WeakLearnerConfig, WeakLearnerEnsemble
 from attention import AttentionConfig, CausalAttentionStage
 from embeddings import EmbeddingConfig, FeatureEmbedding
+from ncl import ncl_loss
 
 __all__ = [
     "SRPConfig",
@@ -45,7 +46,8 @@ AGGREGATORS = ("meanpool", "causal", "bidirectional")
 READOUTS = ("last", "mean")
 TASKS = ("regression", "binary", "multiclass")
 STEP_WEIGHT_SCHEMES = ("uniform", "linear", "exponential")
-ARM_NAMES = ("meanpool", "meanpool_wide", "bidirectional", "causal", "causal_ds")
+POOL_LEVELS = ("embedding", "output")
+ARM_NAMES = ("meanpool", "meanpool_wide", "meanpool_ncl", "bidirectional", "causal", "causal_ds")
 
 
 # ---------------------------------------------------------------------------
@@ -140,6 +142,19 @@ class SRPConfig:
                          quantity used for early stopping and for the final table.
     step_weight_scheme : per-position loss weights under deep supervision.
     task / output_dim  : regression & binary -> 1; multiclass -> n_classes.
+    pool_level          : "embedding" (default) pools expert EMBEDDINGS, then runs the head
+                         ONCE — today's v4, unchanged. "output" runs the (shared) head on
+                         EVERY expert's embedding first, then averages the K scalar
+                         predictions — required for NCL (see ncl.py), since NCL needs each
+                         expert's own prediction, not just its own opinion vector. Only
+                         wired up for aggregator="meanpool" so far.
+    ncl_lambda          : Negative Correlation Learning penalty strength (ncl.py). Only
+                         used when pool_level="output". 0 = plain independent per-learner
+                         training under output-level pooling (isolates the pooling-point
+                         change from the penalty itself).
+    ncl_detach_mean     : see ncl.py's module docstring — provably makes no difference under
+                         this codebase's single-joint-backward training loop; kept for
+                         completeness / anyone training learners with separate updates.
     """
 
     aggregator: str = "causal"
@@ -154,6 +169,9 @@ class SRPConfig:
     # Per-feature embeddings (see embeddings.py). Default "none" = the original v4 model,
     # bit-for-bit: the module is the identity and has no parameters.
     embedding: EmbeddingConfig = field(default_factory=EmbeddingConfig)
+    pool_level: str = "embedding"
+    ncl_lambda: float = 0.0
+    ncl_detach_mean: bool = False
 
     def __post_init__(self):
         if self.aggregator not in AGGREGATORS:
@@ -172,6 +190,15 @@ class SRPConfig:
             raise ValueError(f"{self.task} needs output_dim=1, got {self.output_dim}")
         if self.task == "multiclass" and self.output_dim < 2:
             raise ValueError("multiclass needs output_dim >= 2")
+        if self.pool_level not in POOL_LEVELS:
+            raise ValueError(f"pool_level must be one of {POOL_LEVELS}, got {self.pool_level!r}")
+        if self.pool_level == "output" and self.aggregator != "meanpool":
+            raise ValueError("pool_level='output' is only wired up for aggregator='meanpool' so far")
+        if self.pool_level == "output" and self.task == "multiclass":
+            raise ValueError("ncl.py's penalty is only defined for scalar predictions "
+                             "(regression/binary) — multiclass pool_level='output' is not yet supported")
+        if self.pool_level == "embedding" and (self.ncl_lambda != 0.0 or self.ncl_detach_mean):
+            raise ValueError("ncl_lambda/ncl_detach_mean only apply when pool_level='output'")
 
 
 # ---------------------------------------------------------------------------
@@ -190,7 +217,8 @@ class SRPModel(nn.Module):
 
     def __init__(self, in_dim: int, ensemble_config: WeakLearnerConfig,
                  attention_config: Optional[AttentionConfig] = None,
-                 config: Optional[SRPConfig] = None):
+                 config: Optional[SRPConfig] = None,
+                 bin_edges=None):
         super().__init__()
         self.config = config or SRPConfig()
         c = self.config
@@ -201,7 +229,9 @@ class SRPModel(nn.Module):
         # building the embedding cannot shift the RNG before the experts are initialised.
         self.ensemble = WeakLearnerEnsemble(in_dim, ensemble_config,
                                             in_per_feature=c.embedding.out_per_feature)
-        self.embedding = FeatureEmbedding(in_dim, c.embedding)
+        # bin_edges: only needed for embedding.mode="piecewise_linear" — fixed, fit-from-data
+        # bin boundaries (embeddings.py's compute_quantile_bins), not a learned parameter.
+        self.embedding = FeatureEmbedding(in_dim, c.embedding, bin_edges=bin_edges)
 
         if c.aggregator == "meanpool":
             self.stage = None
@@ -221,11 +251,16 @@ class SRPModel(nn.Module):
 
     def forward(self, x: torch.Tensor, need_weights: bool = False) -> Dict[str, torch.Tensor]:
         c = self.config
-        tokens = self.ensemble(self.embedding(x))
+        tokens = self.ensemble(self.embedding(x), x_raw=x)
         out = {"tokens": tokens, "context": None, "attn": None, "step_preds": None}
 
         if self.stage is None:
-            out["pred"] = self._squeeze(self.head(tokens.mean(dim=1)))
+            if c.pool_level == "output":
+                steps = self._squeeze(self.head(tokens))    # (B, K) — head applied to EVERY expert
+                out["step_preds"] = steps
+                out["pred"] = steps.mean(dim=1)
+            else:
+                out["pred"] = self._squeeze(self.head(tokens.mean(dim=1)))
             return out
 
         ctx, attn = self.stage(tokens, need_weights=need_weights)
@@ -251,11 +286,14 @@ class SRPModel(nn.Module):
         return F.cross_entropy(pred, y.long())
 
     def loss(self, out: Dict[str, torch.Tensor], y: torch.Tensor) -> torch.Tensor:
-        """Training objective: criterion on `pred`, or the weighted sum over positions
-        under deep supervision."""
+        """Training objective: criterion on `pred`, the NCL loss under output-level
+        mean-pooling, or the weighted sum over positions under deep supervision."""
         steps = out["step_preds"]
         if steps is None:
             return self.criterion(out["pred"], y)
+        if self.config.aggregator == "meanpool" and self.config.pool_level == "output":
+            return ncl_loss(steps, y, self.criterion, lambda_ncl=self.config.ncl_lambda,
+                            detach_mean=self.config.ncl_detach_mean)
         K = steps.shape[1]
         w = step_weights(K, self.config.step_weight_scheme, device=steps.device)
         return sum(w[i] * self.criterion(steps[:, i], y) for i in range(K))
@@ -315,13 +353,24 @@ def make_arm(name: str, in_dim: int, ensemble_config: WeakLearnerConfig,
              task: str = "regression", output_dim: int = 1,
              step_weight_scheme: str = "exponential",
              wide_head_depth: int = 2,
-             embedding: Optional[EmbeddingConfig] = None) -> SRPModel:
+             embedding: Optional[EmbeddingConfig] = None,
+             ncl_lambda: float = 0.0,
+             ncl_detach_mean: bool = False,
+             bin_edges=None) -> SRPModel:
     """Build one arm of the ablation. Set torch.manual_seed(seed) right before calling
-    this to get identical expert weights across arms for that seed."""
+    this to get identical expert weights across arms for that seed.
+
+    bin_edges: required iff embedding.mode="piecewise_linear" — see embeddings.py's
+    compute_quantile_bins(). Ignored otherwise."""
     common = dict(task=task, output_dim=output_dim, embedding=embedding or EmbeddingConfig())
 
     if name == "meanpool":
         cfg = SRPConfig(aggregator="meanpool", **common)
+    elif name == "meanpool_ncl":
+        # ncl_lambda=0 isolates the pooling-point change (predict-then-average) from the
+        # penalty itself — compare against "meanpool" to see if THAT alone matters.
+        cfg = SRPConfig(aggregator="meanpool", pool_level="output",
+                        ncl_lambda=ncl_lambda, ncl_detach_mean=ncl_detach_mean, **common)
     elif name == "bidirectional":
         cfg = SRPConfig(aggregator="bidirectional", readout="last", **common)
     elif name == "causal":
@@ -335,7 +384,7 @@ def make_arm(name: str, in_dim: int, ensemble_config: WeakLearnerConfig,
         # global torch seed (which would break identical expert init across arms).
         with torch.random.fork_rng(devices=[]):
             ref = SRPModel(in_dim, ensemble_config, attention_config,
-                           SRPConfig(aggregator="causal", **common))
+                           SRPConfig(aggregator="causal", **common), bin_edges=bin_edges)
             # The experts and the embedding are identical in both arms, so this head's budget
             # is everything else the causal arm spends: its attention stage plus its own head.
             budget = (ref.num_parameters() - ref.ensemble.num_parameters()
@@ -348,7 +397,7 @@ def make_arm(name: str, in_dim: int, ensemble_config: WeakLearnerConfig,
     else:
         raise ValueError(f"unknown arm {name!r}; choose from {ARM_NAMES}")
 
-    return SRPModel(in_dim, ensemble_config, attention_config, cfg)
+    return SRPModel(in_dim, ensemble_config, attention_config, cfg, bin_edges=bin_edges)
 
 
 # ---------------------------------------------------------------------------
@@ -431,3 +480,41 @@ if __name__ == "__main__":
 
     print(f"\n  exponential step weights (K=16): first={step_weights(16)[0]:.2e}  "
           f"last={step_weights(16)[-1]:.3f}  last-3 share={step_weights(16)[-3:].sum():.3f}")
+
+    # 9. meanpool_ncl at lambda=0: same architecture as meanpool (identical param count),
+    #    predict-then-average pooling instead of average-then-predict, step_preds present.
+    ok9a = arms["meanpool_ncl"].num_parameters() == arms["meanpool"].num_parameters()
+    m = arms["meanpool_ncl"].eval()
+    with torch.no_grad():
+        o = m(x)
+    ok9b = o["step_preds"] is not None and tuple(o["step_preds"].shape) == (B, ENS.num_learners)
+    ok9c = torch.allclose(o["pred"], o["step_preds"].mean(dim=1), atol=1e-6)
+    print(f"  [{'PASS' if ok9a else 'FAIL'}] meanpool_ncl has the SAME param count as meanpool "
+          f"({arms['meanpool_ncl'].num_parameters():,} vs {arms['meanpool'].num_parameters():,}) "
+          f"— pooling point is a loss/forward change only, not a capacity change")
+    print(f"  [{'PASS' if ok9b and ok9c else 'FAIL'}] meanpool_ncl produces per-learner step_preds "
+          f"{tuple(o['step_preds'].shape)} and pred == their mean")
+
+    # 10. meanpool_ncl(lambda=0) loss == mean of independent per-learner criterion calls
+    #     (bit-identical to plain independent training — the pooling-point isolation check).
+    m = arms["meanpool_ncl"]
+    out = m(x)
+    got = m.loss(out, y)
+    want = torch.stack([m.criterion(out["step_preds"][:, i], y) for i in range(ENS.num_learners)]).mean()
+    ok10 = torch.allclose(got, want, atol=1e-6)
+    print(f"  [{'PASS' if ok10 else 'FAIL'}] meanpool_ncl(lambda=0) loss exactly equals independent "
+          f"per-learner training ({got.item():.4f} vs {want.item():.4f})")
+
+    # 11. invalid combinations are rejected loudly, not silently ignored
+    def _raises(fn):
+        try:
+            fn()
+            return False
+        except ValueError:
+            return True
+    ok11a = _raises(lambda: SRPConfig(aggregator="causal", pool_level="output"))
+    ok11b = _raises(lambda: SRPConfig(aggregator="meanpool", pool_level="output",
+                                      task="multiclass", output_dim=5))
+    ok11c = _raises(lambda: SRPConfig(aggregator="meanpool", pool_level="embedding", ncl_lambda=0.5))
+    print(f"  [{'PASS' if ok11a and ok11b and ok11c else 'FAIL'}] invalid pool_level/task/ncl_lambda "
+          f"combinations raise ValueError instead of silently doing the wrong thing")

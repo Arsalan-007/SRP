@@ -34,6 +34,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from feature_gating import FeatureGateConfig, FeatureGate
+
 __all__ = [
     "WeakLearnerConfig",
     "make_feature_subsets",
@@ -70,6 +72,8 @@ class WeakLearnerConfig:
                    (~2x faster, identical function). Off by default so that results
                    produced with the loop (notebooks 01-02) reproduce bit-for-bit:
                    batching draws dropout masks in a different order.
+    gate         : feature_gating.FeatureGateConfig. Default mode="none" -> no gate
+                   module runs at all, bit-for-bit identical to pre-gating v4.
     """
 
     num_learners: int = 16
@@ -83,6 +87,7 @@ class WeakLearnerConfig:
     bias: bool = True
     seed: int = 42
     batched: bool = False
+    gate: FeatureGateConfig = field(default_factory=FeatureGateConfig)
 
     def __post_init__(self):
         if self.num_learners < 1:
@@ -210,11 +215,18 @@ class WeakLearnerMLP(nn.Module):
     def num_features(self) -> int:
         return int(self.feat_idx.numel())
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """(B, in_dim) -> (B, embed_dim), or (B, in_dim, d) when features are embedded."""
+    def forward(self, x: torch.Tensor, gate: Optional[torch.Tensor] = None) -> torch.Tensor:
+        """(B, in_dim) -> (B, embed_dim), or (B, in_dim, d) when features are embedded.
+
+        `gate`, if given, is this learner's (B, k) feature relevancy weights from
+        feature_gating.FeatureGate — multiplied in before flattening so a per-feature
+        gate value scales the whole embedded vector for that feature, not just one entry.
+        """
         if x.dim() not in (2, 3):
             raise ValueError(f"expected (B, in_dim) or (B, in_dim, d) input, got {tuple(x.shape)}")
         xi = x.index_select(1, self.feat_idx)
+        if gate is not None:
+            xi = xi * (gate.unsqueeze(-1) if xi.dim() == 3 else gate)
         return self.net(xi.flatten(1) if xi.dim() == 3 else xi)
 
 
@@ -270,6 +282,7 @@ class WeakLearnerEnsemble(nn.Module):
                 for idx in subsets
             ]
         )
+        self.gate = FeatureGate(in_dim, subsets, config.gate)
 
     # -- introspection -------------------------------------------------------
     @property
@@ -296,17 +309,25 @@ class WeakLearnerEnsemble(nn.Module):
         )
 
     # -- forward -------------------------------------------------------------
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """(B, in_dim) -> (B, K, embed_dim). Input may be (B, in_dim, d) if features are embedded."""
+    def forward(self, x: torch.Tensor, x_raw: Optional[torch.Tensor] = None) -> torch.Tensor:
+        """(B, in_dim) -> (B, K, embed_dim). Input may be (B, in_dim, d) if features are embedded.
+
+        `x_raw`, if given, is the ORIGINAL (pre-embedding) (B, in_dim) input — that is
+        what feature_gating.FeatureGate reads to decide relevance. Defaults to `x` itself,
+        which is correct whenever there is no embedding stage upstream (x is already raw).
+        """
         if x.dim() not in (2, 3):
             raise ValueError(f"expected (B, in_dim) or (B, in_dim, d) input, got {tuple(x.shape)}")
         if x.size(1) != self.in_dim:
             raise ValueError(f"expected in_dim={self.in_dim}, got {x.size(1)}")
+        gates = self.gate(x if x_raw is None else x_raw)   # None ("none" mode) or (B, K, k)
         if self.config.batched:
-            return self._forward_batched(x)
-        return torch.stack([lrn(x) for lrn in self.learners], dim=1)
+            return self._forward_batched(x, gates)
+        if gates is None:
+            return torch.stack([lrn(x) for lrn in self.learners], dim=1)
+        return torch.stack([lrn(x, gates[:, i]) for i, lrn in enumerate(self.learners)], dim=1)
 
-    def _forward_batched(self, x: torch.Tensor) -> torch.Tensor:
+    def _forward_batched(self, x: torch.Tensor, gates: Optional[torch.Tensor] = None) -> torch.Tensor:
         """All experts at once. Every expert has the same layer structure and the same
         subset size (coverage patching swaps columns, never changes sizes), so layer j of
         every expert can be stacked into one (K, out, in) weight and applied with a single
@@ -314,6 +335,8 @@ class WeakLearnerEnsemble(nn.Module):
         initialisation and gradients are exactly those of the loop version."""
         idx = torch.stack([lrn.feat_idx for lrn in self.learners])          # (K, k)
         h = x[:, idx]                                                         # (B, K, k[, d])
+        if gates is not None:
+            h = h * (gates.unsqueeze(-1) if h.dim() == 4 else gates)          # broadcast over d
         if h.dim() == 4:
             h = h.flatten(2)                                                  # (B, K, k*d)
         for group in zip(*(lrn.net for lrn in self.learners)):
@@ -400,7 +423,8 @@ class WeakLearnerEnsemble(nn.Module):
         c = self.config
         return (
             f"in_dim={self.in_dim}, K={c.num_learners}, embed_dim={c.embed_dim}, "
-            f"hidden_dim={c.hidden_dim}, depth={c.depth}, feature_frac={c.feature_frac}"
+            f"hidden_dim={c.hidden_dim}, depth={c.depth}, feature_frac={c.feature_frac}, "
+            f"gate={c.gate.mode}"
         )
 
 

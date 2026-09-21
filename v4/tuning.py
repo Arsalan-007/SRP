@@ -39,6 +39,7 @@ from optuna.storages.journal import JournalFileBackend
 
 from attention import AttentionConfig
 from embeddings import EmbeddingConfig
+from feature_gating import FeatureGateConfig
 from model import PlainMLP, SRPConfig, SRPModel
 from training import evaluate, train_model
 from weak_learners import WeakLearnerConfig
@@ -101,30 +102,63 @@ def _embedding_config(params: Dict) -> EmbeddingConfig:
     kw = dict(mode=mode, d_embedding=params["d_embedding"])
     if mode == "periodic":
         kw.update(n_frequencies=params["n_frequencies"], sigma=params["sigma"])
+    elif mode == "piecewise_linear":
+        # Not part of suggest_params's default search space (needs training-data bin edges,
+        # computed by run_config below — an opt-in mode, like gate_mode/ncl_lambda). Set
+        # params["embedding_mode"]="piecewise_linear" and optionally "n_bins" directly.
+        kw["n_bins"] = params.get("n_bins", 16)
     return EmbeddingConfig(**kw)
 
 
+def _gate_config(params: Dict) -> FeatureGateConfig:
+    """Not part of `suggest_params`'s default search space (feature_gating.py is a
+    separate, later hypothesis — see notebook 10). Opt in per-run by adding
+    "gate_mode" (and optionally "gate_hidden_dim") to a params dict before calling
+    `build_model`/`run_config`; absent, this is a no-op, same as every arm before
+    gating existed."""
+    mode = params.get("gate_mode", "none")
+    if mode == "none":
+        return FeatureGateConfig(mode="none")
+    return FeatureGateConfig(mode=mode, hidden_dim=params.get("gate_hidden_dim", 0))
+
+
 def build_model(arm: str, params: Dict, in_dim: int, seed: int, task: str = "regression",
-                output_dim: int = 1, batched: bool = True) -> SRPModel:
-    """Model for one parameter set. Sets torch.manual_seed(seed) before construction."""
+                output_dim: int = 1, batched: bool = True, bin_edges=None) -> SRPModel:
+    """Model for one parameter set. Sets torch.manual_seed(seed) before construction.
+
+    bin_edges: required iff params["embedding_mode"]="piecewise_linear" — computed by
+    run_config() below from training data; build_model() itself stays data-optional."""
     ens = WeakLearnerConfig(num_learners=params["num_learners"], hidden_dim=params["hidden_dim"],
                             embed_dim=params["embed_dim"], depth=params["depth"],
                             dropout=params["dropout"], feature_frac=params["feature_frac"],
-                            seed=seed, batched=batched)
+                            seed=seed, batched=batched, gate=_gate_config(params))
     torch.manual_seed(seed)
     emb = _embedding_config(params)
     if arm == "meanpool":
         cfg = SRPConfig(aggregator="meanpool", head_hidden=params["head_hidden"],
                         head_depth=params["head_depth"], head_dropout=params["dropout"],
                         task=task, output_dim=output_dim, embedding=emb)
-        return SRPModel(in_dim, ens, None, cfg)
+        return SRPModel(in_dim, ens, None, cfg, bin_edges=bin_edges)
+    if arm == "meanpool_ncl":
+        # Not part of suggest_params's default search space (ncl.py is a separate, later
+        # hypothesis — see notebook 11). Opt in via params["ncl_lambda"] (and optionally
+        # "ncl_detach_mean"); absent, ncl_lambda defaults to 0.0 — plain independent
+        # per-learner training under output-level pooling, isolating the pooling-point
+        # change from the penalty itself, same idea as _gate_config above.
+        cfg = SRPConfig(aggregator="meanpool", pool_level="output",
+                        ncl_lambda=params.get("ncl_lambda", 0.0),
+                        ncl_detach_mean=params.get("ncl_detach_mean", False),
+                        head_hidden=params["head_hidden"], head_depth=params["head_depth"],
+                        head_dropout=params["dropout"], task=task, output_dim=output_dim,
+                        embedding=emb)
+        return SRPModel(in_dim, ens, None, cfg, bin_edges=bin_edges)
     if arm == "causal":
         att = AttentionConfig(embed_dim=params["embed_dim"], num_heads=params["num_heads"],
                               attn_depth=params["attn_depth"], dropout=params["dropout"],
                               need_weights=False)
         cfg = SRPConfig(aggregator="causal", readout="last", head_dropout=params["dropout"],
                         task=task, output_dim=output_dim, embedding=emb)
-        return SRPModel(in_dim, ens, att, cfg)
+        return SRPModel(in_dim, ens, att, cfg, bin_edges=bin_edges)
     raise ValueError(f"unknown arm {arm!r}; choose from {NN_ARMS}")
 
 
@@ -140,7 +174,11 @@ def run_config(arm: str, params: Dict, arrays: Dict[str, np.ndarray], seed: int,
     if threads:
         torch.set_num_threads(threads)
     data = _tensors(arrays)
-    model = build_model(arm, params, data["Xtr"].shape[1], seed, task, output_dim)
+    bin_edges = None
+    if params.get("embedding_mode") == "piecewise_linear":
+        from embeddings import compute_quantile_bins
+        bin_edges = compute_quantile_bins(arrays["Xtr"], params.get("n_bins", 16))
+    model = build_model(arm, params, data["Xtr"].shape[1], seed, task, output_dim, bin_edges=bin_edges)
     model, hist = train_model(model, data, seed=seed, epochs=epochs, patience=patience,
                               lr=params["lr"], weight_decay=params["weight_decay"])
     val = evaluate(model, data["Xva"], arrays["yva"], task)

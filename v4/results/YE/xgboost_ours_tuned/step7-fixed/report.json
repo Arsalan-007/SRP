@@ -1,0 +1,22 @@
+{
+  "dataset": "YE",
+  "label": "YearPredictionMSD",
+  "arm": "xgboost_ours_tuned",
+  "tag": "step7-fixed",
+  "seed": null,
+  "source": "documented",
+  "source_ref": "README Step 7 / notebook 08",
+  "config": {},
+  "n_parameters": null,
+  "metrics": {
+    "test": {
+      "test_rmse": 8.8647,
+      "test_rmse_std": null
+    }
+  },
+  "champion_metric": "test_rmse",
+  "champion_value": 8.8647,
+  "higher_is_better": false,
+  "time_seconds": null,
+  "checkpoint": null
+}

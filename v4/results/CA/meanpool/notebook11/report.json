@@ -1,0 +1,22 @@
+{
+  "dataset": "CA",
+  "label": "California Housing",
+  "arm": "meanpool",
+  "tag": "notebook11",
+  "seed": null,
+  "source": "documented",
+  "source_ref": "README Step 10 / notebook 11",
+  "config": {},
+  "n_parameters": null,
+  "metrics": {
+    "test": {
+      "test_rmse": 0.4202,
+      "test_rmse_std": 0.0048
+    }
+  },
+  "champion_metric": "test_rmse",
+  "champion_value": 0.4202,
+  "higher_is_better": false,
+  "time_seconds": null,
+  "checkpoint": null
+}

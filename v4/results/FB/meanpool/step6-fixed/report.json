@@ -1,0 +1,22 @@
+{
+  "dataset": "FB",
+  "label": "Facebook Comments",
+  "arm": "meanpool",
+  "tag": "step6-fixed",
+  "seed": null,
+  "source": "documented",
+  "source_ref": "README Step 6 / notebook 07",
+  "config": {},
+  "n_parameters": 41229,
+  "metrics": {
+    "test": {
+      "test_rmse": 5.9443,
+      "test_rmse_std": 0.0149
+    }
+  },
+  "champion_metric": "test_rmse",
+  "champion_value": 5.9443,
+  "higher_is_better": false,
+  "time_seconds": null,
+  "checkpoint": null
+}

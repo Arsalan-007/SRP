@@ -93,6 +93,11 @@ v4/
 │                         model.py's pool_level="output" (predict-then-average). §3 Step 10.
 ├── v1/                    Your predecessors' code, copied UNCHANGED (do not edit).
 ├── v1_runner.py           Wrapper to run V1 under the same protocol as v4.
+├── results.py              Structured, on-disk results — TabR-inspired report.json-per-run
+│                         convention (never existed before this). save_report/save_checkpoint/
+│                         load_reports/summarize_ranks/best_per_dataset. See its own docstring.
+├── backfill_results.py    Transcribes README Steps 6-12 into results/ (source="documented",
+│                         no fresh compute) — the 121-entry backfill behind the ranking table.
 └── data/                  Downloaded/cached datasets (not synced to git or the server's
                            raw archive — see .gitignore-style excludes in sync script).
 
@@ -394,9 +399,19 @@ scale mismatch and is corrected below.
 | published MLP-PLR | 0.7280 | 5.5250 | 0.9240 |
 
 **Findings:**
-* **Higgs Small and Santander: no improvement beyond seed noise** — best λ in both cases is
-  0.0 (i.e. the search couldn't find a λ>0 that helps), meaning the pooling-point-only
-  control already is the "best," and even that doesn't beat the embedding-level baseline.
+* **Higgs Small and Santander: not just "no improvement" — outright collapse to predicting a
+  constant class at every λ≥0.2.** Checked directly against the raw per-seed log, not just the
+  aggregated "best λ" summary: Higgs Small's test accuracy pins to exactly `0.4714`/`0.5286`
+  (a complementary pair) at every λ from 0.2 to 1.0, across every seed; Santander pins to
+  `0.8995`/`0.1005` (also complementary — the majority/minority class rate). That's the textbook
+  signature of every learner's logit exploding to the same sign: the model stops predicting and
+  just outputs one class. Mechanism: NCL's `-λ(F_i - F̄)²` penalty is unbounded below regardless
+  of task (already known from `ncl.py`'s own regression self-test), but for `binary_cross_entropy_with_logits`
+  specifically, pushing logits to ±∞ in either direction still drives the penalty more negative
+  while the classifier saturates to a constant prediction — a sharper, more specific failure
+  mode than regression's gradual RMSE degradation at high λ. best λ in both cases is 0.0 (i.e.
+  the search correctly avoided the collapse zone), meaning the pooling-point-only control is the
+  "best" available, and even that doesn't beat the embedding-level baseline.
 * **Facebook Comments: genuinely helps** — λ=0.8 improves over the baseline by 0.153 RMSE,
   well beyond seed noise (±0.03-0.05), and beats V1 (6.038) and notebook 07's wide-head PLR
   number (5.793). It does **not**, however, beat our tuned XGBoost (5.402), published
@@ -483,6 +498,58 @@ which learner sits in which slot changes. Runs entirely on CPU (~15 min).
   permutation-invariant aggregator (PMA / set-attention: a learned query cross-attends over
   the K expert embeddings as an unordered set) as the next architectural step, rather than
   continuing to invest in the causal arm as currently designed.
+
+### Step 13 — v4 vs. TabR and TabM (real published numbers, not just FT-Transformer)
+
+Every comparison so far was against one lineage: the FT-Transformer paper's own baselines
+(MLP/ResNet/NODE/FT-Transformer, Step 7) and the num-embeddings paper's CatBoost/MLP-PLR
+(Step 6). Added TabR (Gorishniy et al., 2023, arXiv:2307.14338) and TabM (Gorishniy et al.,
+2025) — both from the same research lineage, both with public repos.
+
+**Provenance, since these numbers matter and shouldn't be trusted blindly:** neither paper's
+own `lib/`/results-analysis code is public (same finding as the results.py research — see
+§2 File map), but both repos commit a `report.json` per run under `.gitignore` rules that
+exclude everything except those reports. Fetched directly from
+`github.com/yandex-research/tabular-dl-tabr` and `github.com/yandex-research/tabm`, and
+**verified the split matches ours before trusting anything** — every fetched report's test-set
+`support` total was checked against our own split sizes (e.g. Adult: 16,281; Higgs Small:
+19,610; Covertype: 116,203) and matched exactly in every case. `TabPFN` and `TabArena` were
+also checked (web search) and explicitly **not** added: TabPFN's published benchmark suites
+don't overlap with these exact splits, and TabArena uses a different protocol entirely
+(8-fold CV, ROC-AUC/log-loss instead of accuracy) — adding either without re-deriving the
+protocol ourselves would not be a real comparison, so the gap is reported honestly rather
+than papered over with an approximate number.
+
+Coverage is partial — only California Housing, Adult, Higgs Small, and Covertype overlap
+with our 8 datasets; Jannis, YearPredictionMSD, Facebook Comments, and Santander aren't in
+either paper's benchmark suite.
+
+| Model | CA (RMSE↓) | AD (acc↑) | HI (acc↑) | CO (acc↑) |
+|---|---|---|---|---|
+| TabR, single (3 seeds) | 0.4010 ± 0.0019 | 0.8704 ± 0.0018 | 0.7298 ± 0.0005 | 0.9764 ± 0.0001 |
+| TabR, 5-model ensemble | 0.3902 | 0.8723 | 0.7322 | 0.9770 |
+| TabM, single (3 seeds) | 0.4292 ± 0.0036 | 0.8683 ± 0.0008 | 0.7370 ± 0.0010 | 0.9767 ± 0.0003 |
+| TabM, 5-model ensemble | 0.4267 | 0.8683 | 0.7394 | 0.9774 |
+| **v4 best (single model)** | **0.4039** (NCL, Step 10) | 0.8608 (causal+PLR) | 0.7245 (meanpool+PLR) | 0.9569 (tuned) |
+
+**Findings:**
+* **v4's NCL result on California Housing beats TabM outright** — 0.4039 vs. TabM's 0.4292
+  (single) and 0.4267 (5-model ensemble). v4, a single model with no ensembling, beats a
+  5-model TabM ensemble here. Comes within 0.014 of TabR's single-seed number (0.4010) too —
+  the closest v4 has come to the actual state of the art on any dataset in the project.
+* **Adult and Higgs Small: v4 trails both**, by a modest but real margin (~0.01-0.013 on
+  Higgs, ~0.008-0.012 on Adult) — consistent with the rest of the project's finding that v4
+  is competitive but not yet SOTA on binary classification.
+* **Covertype: v4 trails badly** — 0.9569 vs. TabR/TabM's ~0.976-0.977, an even larger gap
+  than the one already documented against FT-Transformer/XGBoost (Step 8). This is now
+  confirmed against the CURRENT state of the art for tabular deep learning, not just one
+  2021-era paper — Covertype's gap is not "behind one old baseline," it's behind the whole
+  modern lineage. Reinforces Step 12's verdict: the fix needs to be architectural.
+* Numbers now live in `data/benchmarks/published_gorishniy2022.json` and
+  `data/benchmarks_rtdl/published_gorishniy2021.json` (under a `TabR`/`TabM` key each,
+  with a `tabr_tabm_note` field documenting the provenance above) — reachable via the same
+  `published(key, "TabR"/"TabM", kind="single"/"ensemble")` calls already used for every
+  other reference number in this project.
 
 ---
 

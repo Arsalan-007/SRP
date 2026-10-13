@@ -1,0 +1,22 @@
+{
+  "dataset": "CO",
+  "label": "Covertype",
+  "arm": "causal",
+  "tag": "step7-fixed",
+  "seed": null,
+  "source": "documented",
+  "source_ref": "README Step 7 / notebook 08",
+  "config": {},
+  "n_parameters": 37700,
+  "metrics": {
+    "test": {
+      "test_acc": 0.91,
+      "test_acc_std": null
+    }
+  },
+  "champion_metric": "test_acc",
+  "champion_value": 0.91,
+  "higher_is_better": true,
+  "time_seconds": null,
+  "checkpoint": null
+}

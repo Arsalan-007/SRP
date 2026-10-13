@@ -1,0 +1,22 @@
+{
+  "dataset": "CA",
+  "label": "California Housing",
+  "arm": "resnet_published",
+  "tag": "published",
+  "seed": null,
+  "source": "published",
+  "source_ref": "README Step 7 / notebook 08 (paper)",
+  "config": {},
+  "n_parameters": null,
+  "metrics": {
+    "test": {
+      "test_rmse": 0.486,
+      "test_rmse_std": null
+    }
+  },
+  "champion_metric": "test_rmse",
+  "champion_value": 0.486,
+  "higher_is_better": false,
+  "time_seconds": null,
+  "checkpoint": null
+}

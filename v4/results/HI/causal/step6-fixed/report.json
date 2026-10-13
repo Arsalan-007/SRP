@@ -1,0 +1,22 @@
+{
+  "dataset": "HI",
+  "label": "Higgs Small",
+  "arm": "causal",
+  "tag": "step6-fixed",
+  "seed": null,
+  "source": "documented",
+  "source_ref": "README Step 6 / notebook 07",
+  "config": {},
+  "n_parameters": 41281,
+  "metrics": {
+    "test": {
+      "test_acc": 0.7172,
+      "test_acc_std": 0.0029
+    }
+  },
+  "champion_metric": "test_acc",
+  "champion_value": 0.7172,
+  "higher_is_better": true,
+  "time_seconds": null,
+  "checkpoint": null
+}

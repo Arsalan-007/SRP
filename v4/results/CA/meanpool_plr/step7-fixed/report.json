@@ -1,0 +1,22 @@
+{
+  "dataset": "CA",
+  "label": "California Housing",
+  "arm": "meanpool_plr",
+  "tag": "step7-fixed",
+  "seed": null,
+  "source": "documented",
+  "source_ref": "README Step 7 / notebook 08",
+  "config": {},
+  "n_parameters": 50600,
+  "metrics": {
+    "test": {
+      "test_rmse": 0.5044,
+      "test_rmse_std": null
+    }
+  },
+  "champion_metric": "test_rmse",
+  "champion_value": 0.5044,
+  "higher_is_better": false,
+  "time_seconds": null,
+  "checkpoint": null
+}

@@ -1,0 +1,22 @@
+{
+  "dataset": "HI",
+  "label": "Higgs Small",
+  "arm": "meanpool_ncl_best",
+  "tag": "notebook12",
+  "seed": null,
+  "source": "documented",
+  "source_ref": "README Step 10 extension / notebook 12",
+  "config": {},
+  "n_parameters": null,
+  "metrics": {
+    "test": {
+      "test_acc": 0.7208,
+      "test_acc_std": 0.0039
+    }
+  },
+  "champion_metric": "test_acc",
+  "champion_value": 0.7208,
+  "higher_is_better": true,
+  "time_seconds": null,
+  "checkpoint": null
+}

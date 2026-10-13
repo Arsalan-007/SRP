@@ -1,0 +1,22 @@
+{
+  "dataset": "YE",
+  "label": "YearPredictionMSD",
+  "arm": "plainmlp",
+  "tag": "step7-fixed",
+  "seed": null,
+  "source": "documented",
+  "source_ref": "README Step 7 / notebook 08",
+  "config": {},
+  "n_parameters": 34300,
+  "metrics": {
+    "test": {
+      "test_rmse": 8.8754,
+      "test_rmse_std": null
+    }
+  },
+  "champion_metric": "test_rmse",
+  "champion_value": 8.8754,
+  "higher_is_better": false,
+  "time_seconds": null,
+  "checkpoint": null
+}

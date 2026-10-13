@@ -1,0 +1,22 @@
+{
+  "dataset": "SA",
+  "label": "Santander",
+  "arm": "mlp_published",
+  "tag": "published",
+  "seed": null,
+  "source": "published",
+  "source_ref": "README Step 6 / notebook 07 (paper)",
+  "config": {},
+  "n_parameters": null,
+  "metrics": {
+    "test": {
+      "test_acc": 0.912,
+      "test_acc_std": null
+    }
+  },
+  "champion_metric": "test_acc",
+  "champion_value": 0.912,
+  "higher_is_better": true,
+  "time_seconds": null,
+  "checkpoint": null
+}

@@ -1,0 +1,22 @@
+{
+  "dataset": "CO",
+  "label": "Covertype",
+  "arm": "meanpool_tuned",
+  "tag": "notebook09-optuna",
+  "seed": null,
+  "source": "documented",
+  "source_ref": "README Step 8 / notebook 09",
+  "config": {},
+  "n_parameters": null,
+  "metrics": {
+    "test": {
+      "test_acc": 0.9569,
+      "test_acc_std": 0.002
+    }
+  },
+  "champion_metric": "test_acc",
+  "champion_value": 0.9569,
+  "higher_is_better": true,
+  "time_seconds": null,
+  "checkpoint": null
+}

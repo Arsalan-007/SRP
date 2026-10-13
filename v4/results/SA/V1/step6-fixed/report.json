@@ -1,0 +1,22 @@
+{
+  "dataset": "SA",
+  "label": "Santander",
+  "arm": "V1",
+  "tag": "step6-fixed",
+  "seed": null,
+  "source": "documented",
+  "source_ref": "README Step 6 / notebook 07",
+  "config": {},
+  "n_parameters": 416385,
+  "metrics": {
+    "test": {
+      "test_acc": 0.914,
+      "test_acc_std": 0.0002
+    }
+  },
+  "champion_metric": "test_acc",
+  "champion_value": 0.914,
+  "higher_is_better": true,
+  "time_seconds": null,
+  "checkpoint": null
+}

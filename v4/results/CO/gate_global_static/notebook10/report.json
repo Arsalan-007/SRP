@@ -1,0 +1,22 @@
+{
+  "dataset": "CO",
+  "label": "Covertype",
+  "arm": "gate_global_static",
+  "tag": "notebook10",
+  "seed": null,
+  "source": "documented",
+  "source_ref": "README Step 9 / notebook 10",
+  "config": {},
+  "n_parameters": null,
+  "metrics": {
+    "test": {
+      "test_acc": 0.9573,
+      "test_acc_std": 0.0014
+    }
+  },
+  "champion_metric": "test_acc",
+  "champion_value": 0.9573,
+  "higher_is_better": true,
+  "time_seconds": null,
+  "checkpoint": null
+}

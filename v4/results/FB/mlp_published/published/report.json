@@ -1,0 +1,22 @@
+{
+  "dataset": "FB",
+  "label": "Facebook Comments",
+  "arm": "mlp_published",
+  "tag": "published",
+  "seed": null,
+  "source": "published",
+  "source_ref": "README Step 6 / notebook 07 (paper)",
+  "config": {},
+  "n_parameters": null,
+  "metrics": {
+    "test": {
+      "test_rmse": 5.686,
+      "test_rmse_std": null
+    }
+  },
+  "champion_metric": "test_rmse",
+  "champion_value": 5.686,
+  "higher_is_better": false,
+  "time_seconds": null,
+  "checkpoint": null
+}

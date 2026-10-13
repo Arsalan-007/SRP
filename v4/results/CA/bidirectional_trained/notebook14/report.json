@@ -1,0 +1,22 @@
+{
+  "dataset": "CA",
+  "label": "California Housing",
+  "arm": "bidirectional_trained",
+  "tag": "notebook14",
+  "seed": null,
+  "source": "documented",
+  "source_ref": "README Step 12 / notebook 14",
+  "config": {},
+  "n_parameters": null,
+  "metrics": {
+    "test": {
+      "test_rmse": 0.4145,
+      "test_rmse_std": null
+    }
+  },
+  "champion_metric": "test_rmse",
+  "champion_value": 0.4145,
+  "higher_is_better": false,
+  "time_seconds": null,
+  "checkpoint": null
+}

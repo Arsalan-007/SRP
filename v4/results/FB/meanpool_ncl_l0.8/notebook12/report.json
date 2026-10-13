@@ -1,0 +1,22 @@
+{
+  "dataset": "FB",
+  "label": "Facebook Comments",
+  "arm": "meanpool_ncl_l0.8",
+  "tag": "notebook12",
+  "seed": null,
+  "source": "documented",
+  "source_ref": "README Step 10 extension / notebook 12",
+  "config": {},
+  "n_parameters": null,
+  "metrics": {
+    "test": {
+      "test_rmse": 5.673,
+      "test_rmse_std": 0.05
+    }
+  },
+  "champion_metric": "test_rmse",
+  "champion_value": 5.673,
+  "higher_is_better": false,
+  "time_seconds": null,
+  "checkpoint": null
+}

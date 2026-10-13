@@ -1,0 +1,22 @@
+{
+  "dataset": "SA",
+  "label": "Santander",
+  "arm": "meanpool",
+  "tag": "notebook12",
+  "seed": null,
+  "source": "documented",
+  "source_ref": "README Step 10 extension / notebook 12",
+  "config": {},
+  "n_parameters": null,
+  "metrics": {
+    "test": {
+      "test_acc": 0.9218,
+      "test_acc_std": 0.0013
+    }
+  },
+  "champion_metric": "test_acc",
+  "champion_value": 0.9218,
+  "higher_is_better": true,
+  "time_seconds": null,
+  "checkpoint": null
+}

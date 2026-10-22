@@ -14,6 +14,11 @@ is attributable to how the K expert opinions are combined.
     bidirectional   attention, causal=False, read last token                   (attention without order)
     causal          attention, causal=True,  read last token                   (the staircase)
     causal_ds       causal + exponentially-weighted deep supervision           (v2's full recipe)
+    conf_uniform    predict-then-average, ensemble-level loss                   (confidence control)
+    conf_static     + learned per-expert weight, same for every row             (is any expert better?)
+    conf_dynamic    + per-row confidence from each expert's own token           (does weighting need x?)
+    conf_sigmoid    + per-row INDEPENDENT confidence, explicit / sum(c)      (non-competitive)
+    conf_gumbel     + conf_dynamic with Gumbel noise while training          (does exploring help?)
 
 Build arms with `make_arm()`. For a fixed torch seed, every arm gets bit-identical
 weak-learner weights (the ensemble is constructed first, and capacity matching runs
@@ -40,6 +45,7 @@ __all__ = [
     "step_weights",
     "make_arm",
     "ARM_NAMES",
+    "CONFIDENCE_MODES",
 ]
 
 AGGREGATORS = ("meanpool", "causal", "bidirectional")
@@ -47,7 +53,10 @@ READOUTS = ("last", "mean")
 TASKS = ("regression", "binary", "multiclass")
 STEP_WEIGHT_SCHEMES = ("uniform", "linear", "exponential")
 POOL_LEVELS = ("embedding", "output")
-ARM_NAMES = ("meanpool", "meanpool_wide", "meanpool_ncl", "bidirectional", "causal", "causal_ds")
+CONFIDENCE_MODES = ("none", "uniform", "static", "dynamic", "sigmoid", "gumbel")
+ARM_NAMES = ("meanpool", "meanpool_wide", "meanpool_ncl", "conf_uniform", "conf_static",
+             "conf_dynamic", "conf_sigmoid", "conf_gumbel",
+             "bidirectional", "causal", "causal_ds")
 
 
 # ---------------------------------------------------------------------------
@@ -152,6 +161,31 @@ class SRPConfig:
                          used when pool_level="output". 0 = plain independent per-learner
                          training under output-level pooling (isolates the pooling-point
                          change from the penalty itself).
+    confidence          : per-expert aggregation weights, replacing the plain mean over the K
+                         per-expert predictions. Needs pool_level="output" (each expert must
+                         have its own scalar prediction to weight).
+                           "none"    today's v4, unchanged — plain mean, per-expert NCL loss.
+                           "uniform" fixed 1/K weights. Identical forward to "none"; the ONLY
+                                     difference is that the loss is the criterion on the
+                                     ENSEMBLE prediction, not the mean of per-expert losses.
+                                     This is the control the learned modes are compared against
+                                     — without it, a win could be the objective, not the weights.
+                           "static"  one learned logit per expert (K params), same for every row.
+                           "dynamic" a logit per expert per row, from that expert's own token
+                                     (embed_dim+1 params). The supervisor's c_i.
+                           "sigmoid" a per-row confidence per expert, each judged INDEPENDENTLY
+                                     (sigmoid, not softmax), then divided by their sum. This is
+                                     the supervisor's `sum(y_i c_i) / sum(c_i)` in its literal
+                                     form, and it differs from "dynamic" in kind, not degree:
+                                     softmax is competitive (raising one expert's weight must
+                                     lower another's) and cannot express "every expert is unsure
+                                     about this row"; independent confidences can.
+                           "gumbel"  "dynamic" + Gumbel noise during training only. Soft
+                                     (hard=False), so it explores the same weight space rather
+                                     than hard-routing each row to a single expert.
+                         Weights are softmax-normalised, so they sum to 1 and the supervisor's
+                         `/ sum(c)` denominator is already accounted for.
+    conf_tau            : Gumbel-Softmax temperature. Lower = sparser weights.
     ncl_detach_mean     : see ncl.py's module docstring — provably makes no difference under
                          this codebase's single-joint-backward training loop; kept for
                          completeness / anyone training learners with separate updates.
@@ -172,6 +206,8 @@ class SRPConfig:
     pool_level: str = "embedding"
     ncl_lambda: float = 0.0
     ncl_detach_mean: bool = False
+    confidence: str = "none"
+    conf_tau: float = 1.0
 
     def __post_init__(self):
         if self.aggregator not in AGGREGATORS:
@@ -190,6 +226,17 @@ class SRPConfig:
             raise ValueError(f"{self.task} needs output_dim=1, got {self.output_dim}")
         if self.task == "multiclass" and self.output_dim < 2:
             raise ValueError("multiclass needs output_dim >= 2")
+        if self.confidence not in CONFIDENCE_MODES:
+            raise ValueError(f"confidence must be one of {CONFIDENCE_MODES}, got {self.confidence!r}")
+        if self.confidence != "none" and self.pool_level != "output":
+            raise ValueError("confidence weighting needs pool_level='output' — each expert must "
+                             "have its own scalar prediction before it can be weighted")
+        if self.confidence != "none" and self.ncl_lambda != 0.0:
+            # Not a limitation of the maths, a deliberate scope cut: NCL's penalty pulls experts
+            # away from the UNWEIGHTED mean, so combining the two makes "which effect won?"
+            # unanswerable. Run them as separate arms first.
+            raise ValueError("confidence weighting and ncl_lambda>0 are not combinable yet; "
+                             "run them as separate arms")
         if self.pool_level not in POOL_LEVELS:
             raise ValueError(f"pool_level must be one of {POOL_LEVELS}, got {self.pool_level!r}")
         if self.pool_level == "output" and self.aggregator != "meanpool":
@@ -245,20 +292,54 @@ class SRPModel(nn.Module):
 
         self.head = PredictionHead(D, c.head_hidden, c.head_depth, c.output_dim, c.head_dropout)
 
+        # "uniform" is deliberately parameter-free: it differs from "none" only in the LOSS
+        # (see .loss()), which is what makes it a clean control for the learned modes.
+        if c.confidence in ("static",):
+            self.conf = nn.Parameter(torch.zeros(K))        # softmax(0) = exactly 1/K at init
+        elif c.confidence in ("dynamic", "sigmoid", "gumbel"):
+            self.conf = nn.Linear(D, 1)
+            nn.init.zeros_(self.conf.weight); nn.init.zeros_(self.conf.bias)
+        else:
+            self.conf = None
+
     # -- forward --------------------------------------------------------------
     def _squeeze(self, y: torch.Tensor) -> torch.Tensor:
         return y.squeeze(-1) if self.config.output_dim == 1 else y
 
+    def _conf_weights(self, tokens: torch.Tensor) -> torch.Tensor:
+        """Per-expert aggregation weights, (B, K), each row summing to 1."""
+        c = self.config
+        B = tokens.shape[0]
+        if c.confidence == "static":
+            logits = self.conf.unsqueeze(0).expand(B, -1)
+        else:
+            logits = self.conf(tokens).squeeze(-1)
+        # Gumbel noise is a TRAINING-time exploration device. Sampling it at eval would make
+        # test predictions differ run to run for the same weights.
+        if c.confidence == "sigmoid":
+            # The supervisor's formula literally: independent c_i in (0,1), then / sum(c).
+            # sigmoid(0)=0.5 for every expert, so zero-init still starts at exactly 1/K.
+            conf = torch.sigmoid(logits)
+            return conf / conf.sum(dim=-1, keepdim=True).clamp_min(1e-8)
+        if c.confidence == "gumbel" and self.training:
+            return F.gumbel_softmax(logits, tau=c.conf_tau, hard=False, dim=-1)
+        return logits.softmax(dim=-1)
+
     def forward(self, x: torch.Tensor, need_weights: bool = False) -> Dict[str, torch.Tensor]:
         c = self.config
         tokens = self.ensemble(self.embedding(x), x_raw=x)
-        out = {"tokens": tokens, "context": None, "attn": None, "step_preds": None}
+        out = {"tokens": tokens, "context": None, "attn": None, "step_preds": None, "conf": None}
 
         if self.stage is None:
             if c.pool_level == "output":
                 steps = self._squeeze(self.head(tokens))    # (B, K) — head applied to EVERY expert
                 out["step_preds"] = steps
-                out["pred"] = steps.mean(dim=1)
+                if c.confidence in ("none", "uniform"):
+                    out["pred"] = steps.mean(dim=1)
+                else:
+                    w = self._conf_weights(tokens)
+                    out["conf"] = w
+                    out["pred"] = (steps * w).sum(dim=1)
             else:
                 out["pred"] = self._squeeze(self.head(tokens.mean(dim=1)))
             return out
@@ -290,6 +371,11 @@ class SRPModel(nn.Module):
         mean-pooling, or the weighted sum over positions under deep supervision."""
         steps = out["step_preds"]
         if steps is None:
+            return self.criterion(out["pred"], y)
+        if self.config.confidence != "none":
+            # MUST be the ensemble prediction: ncl_loss below only touches step_preds, so
+            # under it the aggregation weights would receive zero gradient and sit at their
+            # uniform init forever — the arm would silently be a copy of meanpool_ncl.
             return self.criterion(out["pred"], y)
         if self.config.aggregator == "meanpool" and self.config.pool_level == "output":
             return ncl_loss(steps, y, self.criterion, lambda_ncl=self.config.ncl_lambda,
@@ -356,6 +442,7 @@ def make_arm(name: str, in_dim: int, ensemble_config: WeakLearnerConfig,
              embedding: Optional[EmbeddingConfig] = None,
              ncl_lambda: float = 0.0,
              ncl_detach_mean: bool = False,
+             conf_tau: float = 1.0,
              bin_edges=None) -> SRPModel:
     """Build one arm of the ablation. Set torch.manual_seed(seed) right before calling
     this to get identical expert weights across arms for that seed.
@@ -371,6 +458,13 @@ def make_arm(name: str, in_dim: int, ensemble_config: WeakLearnerConfig,
         # penalty itself — compare against "meanpool" to see if THAT alone matters.
         cfg = SRPConfig(aggregator="meanpool", pool_level="output",
                         ncl_lambda=ncl_lambda, ncl_detach_mean=ncl_detach_mean, **common)
+    elif name in ("conf_uniform", "conf_static", "conf_dynamic", "conf_sigmoid", "conf_gumbel"):
+        # Same pooling point as meanpool_ncl; only the weighting and the loss differ.
+        # conf_uniform is the control — compare the others against IT, not against meanpool.
+        mode = {"conf_uniform": "uniform", "conf_static": "static", "conf_dynamic": "dynamic",
+                "conf_sigmoid": "sigmoid", "conf_gumbel": "gumbel"}[name]
+        cfg = SRPConfig(aggregator="meanpool", pool_level="output", confidence=mode,
+                        conf_tau=conf_tau, **common)
     elif name == "bidirectional":
         cfg = SRPConfig(aggregator="bidirectional", readout="last", **common)
     elif name == "causal":
@@ -505,6 +599,85 @@ if __name__ == "__main__":
     print(f"  [{'PASS' if ok10 else 'FAIL'}] meanpool_ncl(lambda=0) loss exactly equals independent "
           f"per-learner training ({got.item():.4f} vs {want.item():.4f})")
 
+    # 10b. confidence weighting: params, normalisation, control-arm equivalence, gradients
+    torch.manual_seed(0); cu = make_arm("conf_uniform", IN_DIM, ENS, ATT)
+    torch.manual_seed(0); cs = make_arm("conf_static", IN_DIM, ENS, ATT)
+    torch.manual_seed(0); cd = make_arm("conf_dynamic", IN_DIM, ENS, ATT)
+    torch.manual_seed(0); ncl_ref = make_arm("meanpool_ncl", IN_DIM, ENS, ATT)
+    D_ = ENS.embed_dim
+    okA = (cu.num_parameters() == ncl_ref.num_parameters()
+           and cs.num_parameters() == cu.num_parameters() + ENS.num_learners
+           and cd.num_parameters() == cu.num_parameters() + D_ + 1)
+    print(f"  [{'PASS' if okA else 'FAIL'}] conf arms cost what they should "
+          f"(uniform +0, static +K={ENS.num_learners}, dynamic +D+1={D_ + 1})")
+
+    for m in (cu, cs, cd, ncl_ref):
+        m.eval()
+    with torch.no_grad():
+        ou, os_, od, oref = cu(x), cs(x), cd(x), ncl_ref(x)
+    # uniform must be a pure loss-level change: its forward is bit-identical to meanpool_ncl's.
+    okB = torch.equal(ou["pred"], oref["pred"]) and ou["conf"] is None
+    print(f"  [{'PASS' if okB else 'FAIL'}] conf_uniform forward == meanpool_ncl forward "
+          f"(it is a LOSS-level control, not an architecture change)")
+    okC = all(torch.allclose(o["conf"].sum(dim=1), torch.ones(B), atol=1e-5) for o in (os_, od))
+    print(f"  [{'PASS' if okC else 'FAIL'}] learned conf weights are softmax-normalised "
+          f"(rows sum to 1, so the supervisor's /sum(c) is already applied)")
+    # Zero-init => both learned modes START at exactly uniform, so they can only improve on it.
+    okD = torch.allclose(os_["pred"], oref["pred"], atol=1e-6) and torch.allclose(od["pred"], oref["pred"], atol=1e-6)
+    print(f"  [{'PASS' if okD else 'FAIL'}] zero-init puts conf_static/conf_dynamic exactly at "
+          f"mean-pooling before training")
+
+    # The whole point of the loss override: without it these grads are None/zero.
+    grads = {}
+    for nm, m in (("static", cs), ("dynamic", cd)):
+        m.train(); m.zero_grad()
+        m.loss(m(x), y).backward()
+        g = m.conf.grad if nm == "static" else m.conf.weight.grad
+        grads[nm] = g is not None and g.abs().sum().item() > 0
+    okE = all(grads.values())
+    print(f"  [{'PASS' if okE else 'FAIL'}] confidence weights actually RECEIVE gradient "
+          f"(static={grads['static']}, dynamic={grads['dynamic']}) — ncl_loss alone would not train them")
+
+    # gumbel must be deterministic at eval, or test numbers move run to run
+    torch.manual_seed(0); cg = make_arm("conf_gumbel", IN_DIM, ENS, ATT)
+    cg.eval()
+    with torch.no_grad():
+        okF = torch.equal(cg(x)["pred"], cg(x)["pred"])
+    print(f"  [{'PASS' if okF else 'FAIL'}] conf_gumbel is deterministic in eval mode "
+          f"(noise is training-only)")
+    cg.train()
+    with torch.no_grad():
+        okF2 = not torch.equal(cg(x)["pred"], cg(x)["pred"])
+    print(f"  [{'PASS' if okF2 else 'FAIL'}] conf_gumbel DOES sample while training "
+          f"(otherwise it would silently be conf_dynamic)")
+
+    # 10c. sigmoid mode: the supervisor's literal sum(y*c)/sum(c), independent confidences
+    torch.manual_seed(0); csg = make_arm("conf_sigmoid", IN_DIM, ENS, ATT)
+    okG = csg.num_parameters() == cd.num_parameters()      # same Linear(D,1) cost as dynamic
+    csg.eval()
+    with torch.no_grad():
+        osg = csg(x)
+    okH = torch.allclose(osg["conf"].sum(dim=1), torch.ones(B), atol=1e-5)
+    okI = torch.allclose(osg["pred"], oref["pred"], atol=1e-6)   # sigmoid(0)=0.5 -> uniform
+    print(f"  [{'PASS' if okG and okH and okI else 'FAIL'}] conf_sigmoid: same cost as dynamic, "
+          f"weights sum to 1 after the explicit /sum(c), and zero-init starts at mean-pooling")
+    # Independence is the WHOLE point vs softmax: raising one logit must NOT force others down
+    # before normalisation. Check the pre-normalisation confidences are not coupled.
+    with torch.no_grad():
+        lg = csg.conf(csg.ensemble(csg.embedding(x))).squeeze(-1)
+        raw = torch.sigmoid(lg)
+        bumped = torch.sigmoid(lg.clone().index_fill_(1, torch.tensor([0]), 5.0))
+    okJ = torch.allclose(raw[:, 1:], bumped[:, 1:], atol=1e-6)
+    print(f"  [{'PASS' if okJ else 'FAIL'}] conf_sigmoid confidences are INDEPENDENT "
+          f"(raising expert 0's logit leaves the others' raw confidence unchanged, unlike softmax)")
+
+    for nm, m in (("sigmoid", csg), ("gumbel", cg)):
+        m.train(); m.zero_grad()
+        m.loss(m(x), y).backward()
+        g = m.conf.weight.grad
+        assert g is not None and g.abs().sum().item() > 0, f"{nm} conf got no gradient"
+    print(f"  [PASS] conf_sigmoid and conf_gumbel weights both receive gradient")
+
     # 11. invalid combinations are rejected loudly, not silently ignored
     def _raises(fn):
         try:
@@ -516,5 +689,9 @@ if __name__ == "__main__":
     ok11b = _raises(lambda: SRPConfig(aggregator="meanpool", pool_level="output",
                                       task="multiclass", output_dim=5))
     ok11c = _raises(lambda: SRPConfig(aggregator="meanpool", pool_level="embedding", ncl_lambda=0.5))
-    print(f"  [{'PASS' if ok11a and ok11b and ok11c else 'FAIL'}] invalid pool_level/task/ncl_lambda "
-          f"combinations raise ValueError instead of silently doing the wrong thing")
+    ok11d = _raises(lambda: SRPConfig(aggregator="meanpool", confidence="static"))
+    ok11e = _raises(lambda: SRPConfig(aggregator="meanpool", pool_level="output",
+                                      confidence="static", ncl_lambda=0.5))
+    print(f"  [{'PASS' if ok11a and ok11b and ok11c and ok11d and ok11e else 'FAIL'}] invalid "
+          f"pool_level/task/ncl_lambda/confidence combinations raise ValueError instead of "
+          f"silently doing the wrong thing")

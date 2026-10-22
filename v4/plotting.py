@@ -77,6 +77,13 @@ PALETTE = {
     "periodic": VIOLET,
     "plr": VIOLET,
     "piecewise_linear": MAGENTA,
+    # Confidence-weighted aggregation: the control shares mean-pool's violet because its
+    # forward IS mean-pooling; the two learned modes get their own hues.
+    "conf_uniform": VIOLET,
+    "conf_static": GREEN,
+    "conf_dynamic": YELLOW,
+    "conf_sigmoid": MAGENTA,
+    "conf_gumbel": RED,
 }
 
 _ALIASES = {
@@ -84,6 +91,9 @@ _ALIASES = {
     "bidirectional attn": "bidirectional", "causal attn": "causal",
     "causal attn + deep sup.": "causal_ds", "histgradientboosting": "xgboost", "ridge": "plainmlp",
     "xgb": "xgboost",
+    "conf uniform": "conf_uniform", "conf static": "conf_static", "conf dynamic": "conf_dynamic",
+    "confidence (static)": "conf_static", "confidence (dynamic)": "conf_dynamic",
+    "conf sigmoid": "conf_sigmoid", "conf gumbel": "conf_gumbel",
 }
 
 

@@ -33,7 +33,7 @@ from pathlib import Path
 from typing import Dict, Optional, Tuple
 
 import numpy as np
-from sklearn.preprocessing import OneHotEncoder, QuantileTransformer
+from preprocessing import PARTS, preprocess_splits, standardise_target
 
 __all__ = ["BENCHMARKS", "BenchmarkData", "load_benchmark", "published", "published_table"]
 
@@ -49,7 +49,6 @@ BENCHMARKS = {
     "SA": dict(folder="santander", label="Santander", sizes=(128_000, 32_000, 40_000)),
 }
 _TASK = {"binclass": "binary", "multiclass": "multiclass", "regression": "regression"}
-PARTS = ("train", "val", "test")
 
 
 @dataclass
@@ -118,46 +117,14 @@ def load_benchmark(key: str, seed: int = 0) -> BenchmarkData:
     if sizes != meta["sizes"]:
         raise ValueError(f"{key}: split sizes {sizes} differ from the paper's {meta['sizes']}")
 
-    blocks = {p: [] for p in PARTS}
-    if Xn is not None:
-        Xn = {p: Xn[p].astype(np.float64) for p in PARTS}
-        mean = np.nanmean(Xn["train"], axis=0)
-        for p in PARTS:
-            nan = np.isnan(Xn[p])
-            if nan.any():
-                Xn[p] = np.where(nan, mean, Xn[p])
-        X_fit = Xn["train"]
-        noise = 1e-3
-        stds = np.std(X_fit, axis=0, keepdims=True)
-        X_fit = X_fit + (noise / np.maximum(stds, noise)) * \
-            np.random.default_rng(seed).standard_normal(X_fit.shape)
-        qt = QuantileTransformer(output_distribution="normal",
-                                 n_quantiles=max(min(len(X_fit) // 30, 1000), 10),
-                                 subsample=int(1e9), random_state=seed).fit(X_fit)
-        for p in PARTS:
-            blocks[p].append(qt.transform(Xn[p]))
-    if Xc is not None:
-        Xc = {p: np.asarray(Xc[p]).astype(str) for p in PARTS}     # NaN becomes its own category
-        enc = OneHotEncoder(handle_unknown="ignore", sparse_output=False,
-                            dtype=np.float32).fit(Xc["train"])
-        for p in PARTS:
-            blocks[p].append(enc.transform(Xc[p]))
-    X = {p: np.hstack(blocks[p]).astype(np.float32) for p in PARTS}
-
-    y_mean, y_std, n_classes = 0.0, 1.0, 0
-    if task == "regression":
-        y_mean, y_std = float(y["train"].mean()), float(y["train"].std())
-        y = {p: ((y[p] - y_mean) / y_std).astype(np.float32) for p in PARTS}
-    else:
-        y = {p: y[p].astype(np.int64) for p in PARTS}
-        n_classes = int(max(y[p].max() for p in PARTS)) + 1
+    X, n_num, n_onehot = preprocess_splits(Xn, Xc, seed=seed)
+    y, y_mean, y_std, n_classes = standardise_target(y, task)
 
     return BenchmarkData(key=key, label=meta["label"], task=task,
                          X_tr=X["train"], y_tr=y["train"], X_va=X["val"], y_va=y["val"],
                          X_te=X["test"], y_te=y["test"], n_classes=n_classes,
                          y_mean=y_mean, y_std=y_std,
-                         info={**info, "n_num": 0 if Xn is None else Xn["train"].shape[1],
-                               "n_cat_onehot": 0 if Xc is None else blocks["train"][-1].shape[1]})
+                         info={**info, "n_num": n_num, "n_cat_onehot": n_onehot})
 
 
 # ---------------------------------------------------------------------------

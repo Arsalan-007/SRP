@@ -26,7 +26,7 @@ Design notes (carried over from the v1/v2/v3 post-mortem)
 """
 
 from collections import Counter
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, fields
 from typing import Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
@@ -38,6 +38,7 @@ from feature_gating import FeatureGateConfig, FeatureGate
 
 __all__ = [
     "WeakLearnerConfig",
+    "default_ens",
     "make_feature_subsets",
     "WeakLearnerMLP",
     "WeakLearnerEnsemble",
@@ -107,6 +108,34 @@ class WeakLearnerConfig:
 # ---------------------------------------------------------------------------
 # Feature bagging
 # ---------------------------------------------------------------------------
+def default_ens(**overrides) -> dict:
+    """The canonical expert configuration, as a dict ready for `WeakLearnerConfig(**...)`.
+
+    THE single source of truth for "what the architecture is". Everything that needs those
+    numbers — cli.py, tuning.py, and every notebook — calls this instead of restating them,
+    so changing `embed_dim` here changes it everywhere rather than in ten files that only
+    look like they agree.
+
+    Per-run fields are excluded (`seed`, `batched`) along with the nested `gate` config, so
+    the result is exactly the architecture and callers still supply their own seed:
+
+        WeakLearnerConfig(**default_ens(), seed=seed, batched=True)
+        WeakLearnerConfig(**default_ens(feature_frac=0.4), seed=seed)
+
+    A sweep over one field drops it instead of overriding it, so the loop stays the only
+    place that sets it:
+
+        ENS_KW = default_ens(); ENS_KW.pop("feature_frac")
+    """
+    base = {f.name: getattr(WeakLearnerConfig(), f.name)
+            for f in fields(WeakLearnerConfig) if f.name not in ("seed", "batched", "gate")}
+    unknown = set(overrides) - set(base)
+    if unknown:
+        raise ValueError(f"unknown expert config field(s) {sorted(unknown)}; "
+                         f"choose from {sorted(base)}")
+    return {**base, **overrides}
+
+
 def make_feature_subsets(
     in_dim: int,
     num_learners: int,

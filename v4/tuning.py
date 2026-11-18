@@ -42,7 +42,7 @@ from embeddings import EmbeddingConfig
 from feature_gating import FeatureGateConfig
 from model import PlainMLP, SRPConfig, SRPModel
 from training import evaluate, train_model
-from weak_learners import WeakLearnerConfig
+from weak_learners import WeakLearnerConfig, default_ens
 
 __all__ = ["NN_ARMS", "STEP3_DEFAULTS", "suggest_params", "build_model", "run_config",
            "create_study", "optuna_worker", "tune_xgb", "make_xgb", "xgb_metrics",
@@ -51,11 +51,13 @@ __all__ = ["NN_ARMS", "STEP3_DEFAULTS", "suggest_params", "build_model", "run_co
 NN_ARMS = ("meanpool", "causal")
 
 # The step-3 configurations, expressed in this module's parameter format.
+# The expert fields come from weak_learners.default_ens() so they cannot drift from the
+# rest of the codebase; only the per-arm training/aggregator knobs are spelled out here.
+_ENS = {k: v for k, v in default_ens().items()
+        if k in ("num_learners", "hidden_dim", "embed_dim", "depth", "feature_frac", "dropout")}
 STEP3_DEFAULTS = {
-    "meanpool": dict(num_learners=16, hidden_dim=16, embed_dim=32, depth=1, feature_frac=0.7,
-                     dropout=0.1, lr=1e-3, weight_decay=1e-4, head_hidden=148, head_depth=2),
-    "causal":   dict(num_learners=16, hidden_dim=16, embed_dim=32, depth=1, feature_frac=0.7,
-                     dropout=0.1, lr=1e-3, weight_decay=1e-4, num_heads=4, attn_depth=2),
+    "meanpool": dict(**_ENS, lr=1e-3, weight_decay=1e-4, head_hidden=148, head_depth=2),
+    "causal":   dict(**_ENS, lr=1e-3, weight_decay=1e-4, num_heads=4, attn_depth=2),
 }
 
 

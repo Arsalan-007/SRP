@@ -19,6 +19,8 @@ is attributable to how the K expert opinions are combined.
     conf_dynamic    + per-row confidence from each expert's own token           (does weighting need x?)
     conf_sigmoid    + per-row INDEPENDENT confidence, explicit / sum(c)      (non-competitive)
     conf_gumbel     + conf_dynamic with Gumbel noise while training          (does exploring help?)
+    expert_beta     ensemble loss + beta * mean per-expert loss               (make experts differ)
+    conf_beta       expert_beta + a dynamic router over the result            (the full MoE recipe)
 
 Build arms with `make_arm()`. For a fixed torch seed, every arm gets bit-identical
 weak-learner weights (the ensemble is constructed first, and capacity matching runs
@@ -32,7 +34,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from weak_learners import WeakLearnerConfig, WeakLearnerEnsemble
+from weak_learners import WeakLearnerConfig, WeakLearnerEnsemble, SharedWeightEnsemble
 from attention import AttentionConfig, CausalAttentionStage
 from embeddings import EmbeddingConfig, FeatureEmbedding
 from ncl import ncl_loss
@@ -55,7 +57,7 @@ STEP_WEIGHT_SCHEMES = ("uniform", "linear", "exponential")
 POOL_LEVELS = ("embedding", "output")
 CONFIDENCE_MODES = ("none", "uniform", "static", "dynamic", "sigmoid", "gumbel")
 ARM_NAMES = ("meanpool", "meanpool_wide", "meanpool_ncl", "conf_uniform", "conf_static",
-             "conf_dynamic", "conf_sigmoid", "conf_gumbel",
+             "conf_dynamic", "conf_sigmoid", "conf_gumbel", "expert_beta", "conf_beta",
              "bidirectional", "causal", "causal_ds")
 
 
@@ -208,6 +210,7 @@ class SRPConfig:
     ncl_detach_mean: bool = False
     confidence: str = "none"
     conf_tau: float = 1.0
+    expert_loss_beta: float = 0.0
 
     def __post_init__(self):
         if self.aggregator not in AGGREGATORS:
@@ -237,13 +240,31 @@ class SRPConfig:
             # unanswerable. Run them as separate arms first.
             raise ValueError("confidence weighting and ncl_lambda>0 are not combinable yet; "
                              "run them as separate arms")
+        if self.expert_loss_beta < 0.0:
+            raise ValueError(f"expert_loss_beta must be >= 0, got {self.expert_loss_beta}")
+        if self.expert_loss_beta != 0.0 and self.pool_level != "output":
+            raise ValueError("expert_loss_beta needs pool_level='output' — the per-expert term "
+                             "requires each expert to have its own scalar prediction")
+        if self.expert_loss_beta != 0.0 and self.ncl_lambda != 0.0:
+            # Same deliberate scope cut as confidence+NCL: both terms change what an individual
+            # expert is trained for, so running them together makes "which one helped?"
+            # unanswerable. NCL subtracts a deviation bonus; beta adds an accuracy duty.
+            raise ValueError("expert_loss_beta and ncl_lambda>0 are not combinable yet; "
+                             "run them as separate arms")
         if self.pool_level not in POOL_LEVELS:
             raise ValueError(f"pool_level must be one of {POOL_LEVELS}, got {self.pool_level!r}")
         if self.pool_level == "output" and self.aggregator != "meanpool":
             raise ValueError("pool_level='output' is only wired up for aggregator='meanpool' so far")
-        if self.pool_level == "output" and self.task == "multiclass":
-            raise ValueError("ncl.py's penalty is only defined for scalar predictions "
-                             "(regression/binary) — multiclass pool_level='output' is not yet supported")
+        if self.pool_level == "output" and self.task == "multiclass" and (
+                self.ncl_lambda != 0.0 or self.expert_loss_beta != 0.0 or self.ncl_detach_mean):
+            # Narrowed from a blanket ban: the PENALTY is scalar-only (ncl.py's (F_i-Fbar)^2
+            # is undefined for a logit vector), but plain predict-then-average is not — it is
+            # mean over K of (B,K,C) then cross-entropy. Covertype is the only multiclass
+            # dataset here and the one with the largest gap, so banning the whole pooling
+            # point there cost more than it protected.
+            raise ValueError("ncl_lambda/expert_loss_beta need scalar per-expert predictions "
+                             "(ncl.py), so they do not support multiclass; plain "
+                             "pool_level='output' multiclass IS supported")
         if self.pool_level == "embedding" and (self.ncl_lambda != 0.0 or self.ncl_detach_mean):
             raise ValueError("ncl_lambda/ncl_detach_mean only apply when pool_level='output'")
 
@@ -274,8 +295,12 @@ class SRPModel(nn.Module):
         # Constructed FIRST so a fixed torch seed gives identical expert weights in every arm.
         # The embedding's width is read from the config (not from the built module) so that
         # building the embedding cannot shift the RNG before the experts are initialised.
-        self.ensemble = WeakLearnerEnsemble(in_dim, ensemble_config,
-                                            in_per_feature=c.embedding.out_per_feature)
+        # ensemble_config.shared picks the parameterisation: K independent MLPs (default,
+        # unchanged) or K BatchEnsemble members over one shared weight (TabM). Both expose
+        # the same (B, K, embed_dim) contract, so nothing downstream changes.
+        ens_cls = SharedWeightEnsemble if ensemble_config.shared else WeakLearnerEnsemble
+        self.ensemble = ens_cls(in_dim, ensemble_config,
+                                in_per_feature=c.embedding.out_per_feature)
         # bin_edges: only needed for embedding.mode="piecewise_linear" — fixed, fit-from-data
         # bin boundaries (embeddings.py's compute_quantile_bins), not a learned parameter.
         self.embedding = FeatureEmbedding(in_dim, c.embedding, bin_edges=bin_edges)
@@ -339,7 +364,9 @@ class SRPModel(nn.Module):
                 else:
                     w = self._conf_weights(tokens)
                     out["conf"] = w
-                    out["pred"] = (steps * w).sum(dim=1)
+                    # steps is (B,K) for regression/binary but (B,K,C) for multiclass; the
+                    # weights are per-expert either way, so they need a class axis to broadcast.
+                    out["pred"] = (steps * (w if steps.dim() == 2 else w.unsqueeze(-1))).sum(dim=1)
             else:
                 out["pred"] = self._squeeze(self.head(tokens.mean(dim=1)))
             return out
@@ -368,16 +395,37 @@ class SRPModel(nn.Module):
 
     def loss(self, out: Dict[str, torch.Tensor], y: torch.Tensor) -> torch.Tensor:
         """Training objective: criterion on `pred`, the NCL loss under output-level
-        mean-pooling, or the weighted sum over positions under deep supervision."""
+        mean-pooling, or the weighted sum over positions under deep supervision.
+        `expert_loss_beta` instead adds a per-expert accuracy term on top of the ensemble
+        loss, taking precedence over both of the branches below."""
         steps = out["step_preds"]
         if steps is None:
             return self.criterion(out["pred"], y)
+        beta = self.config.expert_loss_beta
+        if beta != 0.0:
+            # Ensemble loss + beta * mean per-expert loss. Feature bagging makes experts see
+            # different columns but the ensemble loss asks all of them to reduce the SAME
+            # error, so they end up diverse in inputs and interchangeable in function (0.07
+            # mean cosine, yet confidence weighting found nothing to route over). This term is
+            # what makes an expert individually accountable, and so the only thing here that
+            # can produce DIFFERENTIAL competence. beta=0 is conf_uniform; beta -> inf
+            # approaches meanpool_ncl at lambda=0, which notebook 11 measured as clearly worse
+            # than the ensemble loss (0.4501 vs 0.4202 RMSE on CA) — so useful beta is small.
+            # criterion(out["pred"]) must stay in: under confidence weighting it is the only
+            # term the router's weights appear in, exactly as in the branch below.
+            return (self.criterion(out["pred"], y)
+                    + beta * ncl_loss(steps, y, self.criterion, lambda_ncl=0.0))
         if self.config.confidence != "none":
             # MUST be the ensemble prediction: ncl_loss below only touches step_preds, so
             # under it the aggregation weights would receive zero gradient and sit at their
             # uniform init forever — the arm would silently be a copy of meanpool_ncl.
             return self.criterion(out["pred"], y)
         if self.config.aggregator == "meanpool" and self.config.pool_level == "output":
+            if steps.dim() == 3:
+                # Multiclass. __post_init__ already rejected ncl_lambda/beta here, so the
+                # objective is the plain ensemble loss — NOT the deep-supervision branch
+                # below, which would weight expert positions as if they were time steps.
+                return self.criterion(out["pred"], y)
             return ncl_loss(steps, y, self.criterion, lambda_ncl=self.config.ncl_lambda,
                             detach_mean=self.config.ncl_detach_mean)
         K = steps.shape[1]
@@ -443,6 +491,7 @@ def make_arm(name: str, in_dim: int, ensemble_config: WeakLearnerConfig,
              ncl_lambda: float = 0.0,
              ncl_detach_mean: bool = False,
              conf_tau: float = 1.0,
+             expert_loss_beta: float = 0.0,
              bin_edges=None) -> SRPModel:
     """Build one arm of the ablation. Set torch.manual_seed(seed) right before calling
     this to get identical expert weights across arms for that seed.
@@ -450,6 +499,11 @@ def make_arm(name: str, in_dim: int, ensemble_config: WeakLearnerConfig,
     bin_edges: required iff embedding.mode="piecewise_linear" — see embeddings.py's
     compute_quantile_bins(). Ignored otherwise."""
     common = dict(task=task, output_dim=output_dim, embedding=embedding or EmbeddingConfig())
+    if name in ("expert_beta", "conf_beta") and expert_loss_beta <= 0.0:
+        # Without this the arm would silently fall through to a DIFFERENT loss branch
+        # (pure per-expert via ncl_loss at lambda=0), i.e. the beta -> inf end, not beta=0.
+        raise ValueError(f"arm {name!r} needs expert_loss_beta > 0, got {expert_loss_beta}; "
+                         f"the beta=0 control is the 'conf_uniform' arm")
 
     if name == "meanpool":
         cfg = SRPConfig(aggregator="meanpool", **common)
@@ -465,6 +519,16 @@ def make_arm(name: str, in_dim: int, ensemble_config: WeakLearnerConfig,
                 "conf_sigmoid": "sigmoid", "conf_gumbel": "gumbel"}[name]
         cfg = SRPConfig(aggregator="meanpool", pool_level="output", confidence=mode,
                         conf_tau=conf_tau, **common)
+    elif name == "expert_beta":
+        # Per-expert accountability alone, no router. Compare against conf_uniform (beta=0).
+        cfg = SRPConfig(aggregator="meanpool", pool_level="output",
+                        expert_loss_beta=expert_loss_beta, **common)
+    elif name == "conf_beta":
+        # The full MoE recipe: beta creates competence differences, the dynamic router exploits
+        # them. Compare against expert_beta to isolate the router's contribution, and against
+        # conf_dynamic (notebooks 17/18, null) to see whether beta is what the router was missing.
+        cfg = SRPConfig(aggregator="meanpool", pool_level="output", confidence="dynamic",
+                        conf_tau=conf_tau, expert_loss_beta=expert_loss_beta, **common)
     elif name == "bidirectional":
         cfg = SRPConfig(aggregator="bidirectional", readout="last", **common)
     elif name == "causal":
@@ -509,7 +573,9 @@ if __name__ == "__main__":
     arms, ens_states = {}, {}
     for name in ARM_NAMES:
         torch.manual_seed(0)
-        m = make_arm(name, IN_DIM, ENS, ATT)
+        # beta arms refuse beta=0 on purpose (it would be a different loss branch), so the
+        # sweep hands every arm a beta; the non-beta arms ignore it.
+        m = make_arm(name, IN_DIM, ENS, ATT, expert_loss_beta=0.3)
         arms[name] = m
         ens_states[name] = {k: v.clone() for k, v in m.ensemble.state_dict().items()}
         out = m(x)
@@ -678,6 +744,90 @@ if __name__ == "__main__":
         assert g is not None and g.abs().sum().item() > 0, f"{nm} conf got no gradient"
     print(f"  [PASS] conf_sigmoid and conf_gumbel weights both receive gradient")
 
+    # 10d. expert_loss_beta: the per-expert accountability term
+    BETA = 0.3
+    torch.manual_seed(0); eb = make_arm("expert_beta", IN_DIM, ENS, ATT, expert_loss_beta=BETA)
+    eb.train(); ob = eb(x)
+    # The formula, literally: criterion(ensemble pred) + beta * mean_i criterion(expert i).
+    want = (eb.criterion(ob["pred"], y)
+            + BETA * torch.stack([eb.criterion(ob["step_preds"][:, i], y)
+                                  for i in range(ob["step_preds"].shape[1])]).mean())
+    okK = torch.allclose(eb.loss(ob, y), want, atol=1e-6)
+    print(f"  [{'PASS' if okK else 'FAIL'}] expert_beta loss == criterion(pred) + beta*mean_i "
+          f"criterion(expert_i)  ({eb.loss(ob, y).item():.6f} vs {want.item():.6f})")
+
+    # beta=0 must reproduce conf_uniform's loss exactly, and large beta must approach the
+    # pure per-expert loss (meanpool_ncl at lambda=0) — i.e. beta really is the interpolation.
+    torch.manual_seed(0); cu = make_arm("conf_uniform", IN_DIM, ENS, ATT)
+    torch.manual_seed(0); mn = make_arm("meanpool_ncl", IN_DIM, ENS, ATT, ncl_lambda=0.0)
+    # eval(), not train(): dropout would give each forward a different mask and these three
+    # models must see bit-identical activations for the comparison to mean anything.
+    cu.eval(); mn.eval()
+    with torch.no_grad():
+        ens_only = cu.loss(cu(x), y)
+        per_expert_only = mn.loss(mn(x), y)
+        torch.manual_seed(0)
+        eb_big = make_arm("expert_beta", IN_DIM, ENS, ATT, expert_loss_beta=1e4).eval()
+        ratio = (eb_big.loss(eb_big(x), y) / 1e4)
+    okL = torch.allclose(ratio, per_expert_only, rtol=1e-3)
+    print(f"  [{'PASS' if okL else 'FAIL'}] beta interpolates: beta->inf recovers the pure "
+          f"per-expert loss ({ratio.item():.4f} vs {per_expert_only.item():.4f}); the beta=0 "
+          f"end is conf_uniform's ensemble loss ({ens_only.item():.4f})")
+
+    # THE point of beta: every expert's own prediction must receive gradient. Under the
+    # plain ensemble loss an expert is only ever graded on the average, which is why
+    # notebooks 17/18 found nothing for a router to exploit.
+    eb.zero_grad()
+    sp = eb(x)["step_preds"]
+    sp.retain_grad()
+    eb.loss({**eb(x), "step_preds": sp, "pred": sp.mean(dim=1)}, y).backward()
+    okM = sp.grad is not None and (sp.grad.abs().sum(0) > 0).all()
+    print(f"  [{'PASS' if okM else 'FAIL'}] every expert's OWN prediction receives nonzero "
+          f"gradient under beta (the mechanism confidence weighting was missing)")
+
+    # conf_beta: beta must not starve the router, the bug that nearly made conf_* a no-op.
+    torch.manual_seed(0); cb = make_arm("conf_beta", IN_DIM, ENS, ATT, expert_loss_beta=BETA)
+    cb.train(); cb.zero_grad()
+    cb.loss(cb(x), y).backward()
+    gw = cb.conf.weight.grad
+    okN = (gw is not None and gw.abs().sum().item() > 0
+           and cb.num_parameters() == cd.num_parameters())   # beta adds no parameters
+    print(f"  [{'PASS' if okN else 'FAIL'}] conf_beta: router weights still get gradient and "
+          f"beta costs no extra parameters (same size as conf_dynamic)")
+
+    # 10e. multiclass predict-then-average (unblocked for Covertype; TabM averages
+    #      PREDICTIONS, so the comparison needs this pooling point on a 7-class task).
+    C = 7
+    ymc = torch.randint(0, C, (B,))
+    mc_ok = []
+    for nm in ("meanpool_ncl", "conf_uniform", "conf_dynamic"):
+        torch.manual_seed(0)
+        mm = make_arm(nm, IN_DIM, ENS, ATT, task="multiclass", output_dim=C)
+        mm.train(); o = mm(x)
+        lo = mm.loss(o, ymc)
+        shapes = o["pred"].shape == (B, C) and o["step_preds"].shape == (B, C) if False else (
+            o["pred"].shape == (B, C) and o["step_preds"].shape == (B, mm.ensemble.num_learners, C))
+        # The loss must be cross-entropy on the AVERAGED logits, not the deep-supervision
+        # weighted sum over expert positions (which that branch would silently fall into).
+        want = F.cross_entropy(o["pred"], ymc.long())
+        mm.zero_grad(); lo.backward()
+        grads = all(p.grad is not None and torch.isfinite(p.grad).all()
+                    for p in mm.parameters() if p.requires_grad)
+        mc_ok.append(shapes and torch.isfinite(lo) and torch.allclose(lo, want, atol=1e-6) and grads)
+    print(f"  [{'PASS' if all(mc_ok) else 'FAIL'}] multiclass pool_level='output' works for "
+          f"meanpool_ncl/conf_uniform/conf_dynamic: pred (B,{C}), step_preds (B,K,{C}), loss == "
+          f"cross_entropy(mean logits), gradients finite")
+
+    # conf weights must still normalise once a class axis is in play (the unsqueeze fix).
+    torch.manual_seed(0)
+    mcd = make_arm("conf_dynamic", IN_DIM, ENS, ATT, task="multiclass", output_dim=C).eval()
+    with torch.no_grad():
+        omc = mcd(x)
+    okMC = (torch.allclose(omc["conf"].sum(dim=1), torch.ones(B), atol=1e-5)
+            and torch.allclose(omc["pred"], omc["step_preds"].mean(dim=1), atol=1e-5))
+    print(f"  [{'PASS' if okMC else 'FAIL'}] multiclass conf weights sum to 1 and zero-init "
+          f"still equals plain mean-pooling over the class axis")
+
     # 11. invalid combinations are rejected loudly, not silently ignored
     def _raises(fn):
         try:
@@ -686,12 +836,24 @@ if __name__ == "__main__":
         except ValueError:
             return True
     ok11a = _raises(lambda: SRPConfig(aggregator="causal", pool_level="output"))
-    ok11b = _raises(lambda: SRPConfig(aggregator="meanpool", pool_level="output",
-                                      task="multiclass", output_dim=5))
+    ok11b = (not _raises(lambda: SRPConfig(aggregator="meanpool", pool_level="output",
+                                           task="multiclass", output_dim=5))
+             and _raises(lambda: SRPConfig(aggregator="meanpool", pool_level="output",
+                                           task="multiclass", output_dim=5, ncl_lambda=0.5))
+             and _raises(lambda: SRPConfig(aggregator="meanpool", pool_level="output",
+                                           task="multiclass", output_dim=5,
+                                           expert_loss_beta=0.3)))
     ok11c = _raises(lambda: SRPConfig(aggregator="meanpool", pool_level="embedding", ncl_lambda=0.5))
     ok11d = _raises(lambda: SRPConfig(aggregator="meanpool", confidence="static"))
     ok11e = _raises(lambda: SRPConfig(aggregator="meanpool", pool_level="output",
                                       confidence="static", ncl_lambda=0.5))
-    print(f"  [{'PASS' if ok11a and ok11b and ok11c and ok11d and ok11e else 'FAIL'}] invalid "
-          f"pool_level/task/ncl_lambda/confidence combinations raise ValueError instead of "
-          f"silently doing the wrong thing")
+    ok11f = _raises(lambda: SRPConfig(aggregator="meanpool", expert_loss_beta=0.3))
+    ok11g = _raises(lambda: SRPConfig(aggregator="meanpool", pool_level="output",
+                                      expert_loss_beta=0.3, ncl_lambda=0.5))
+    ok11h = _raises(lambda: SRPConfig(expert_loss_beta=-0.1))
+    # beta=0 on a beta arm would silently become the beta->inf branch, so make_arm rejects it.
+    ok11i = _raises(lambda: make_arm("expert_beta", IN_DIM, ENS, ATT))
+    ok11j = _raises(lambda: make_arm("conf_beta", IN_DIM, ENS, ATT, expert_loss_beta=0.0))
+    print(f"  [{'PASS' if all((ok11a, ok11b, ok11c, ok11d, ok11e, ok11f, ok11g, ok11h, ok11i, ok11j)) else 'FAIL'}] "
+          f"invalid pool_level/task/ncl_lambda/confidence/beta combinations raise ValueError "
+          f"instead of silently doing the wrong thing")

@@ -40,7 +40,7 @@ from optuna.storages.journal import JournalFileBackend
 from attention import AttentionConfig
 from embeddings import EmbeddingConfig
 from feature_gating import FeatureGateConfig
-from model import PlainMLP, SRPConfig, SRPModel
+from model import PlainMLP, SRPConfig, SRPModel, make_arm
 from training import evaluate, train_model
 from weak_learners import WeakLearnerConfig, default_ens
 
@@ -154,6 +154,15 @@ def build_model(arm: str, params: Dict, in_dim: int, seed: int, task: str = "reg
                         head_dropout=params["dropout"], task=task, output_dim=output_dim,
                         embedding=emb)
         return SRPModel(in_dim, ens, None, cfg, bin_edges=bin_edges)
+    if arm in ("conf_uniform", "conf_static", "conf_dynamic", "conf_sigmoid", "conf_gumbel",
+               "expert_beta", "conf_beta"):
+        # Output-level pooling with a loss/weighting variant. make_arm() already owns the
+        # name -> SRPConfig mapping, and its head defaults (head_hidden=embed_dim, depth=1,
+        # dropout=0.1) are exactly what BASE_PARAMS passes, so reuse it rather than
+        # restating every config here. Opt into beta via params["expert_loss_beta"].
+        return make_arm(arm, in_dim, ens, None, task=task, output_dim=output_dim,
+                        embedding=emb, bin_edges=bin_edges,
+                        expert_loss_beta=params.get("expert_loss_beta", 0.0))
     if arm == "causal":
         att = AttentionConfig(embed_dim=params["embed_dim"], num_heads=params["num_heads"],
                               attn_depth=params["attn_depth"], dropout=params["dropout"],

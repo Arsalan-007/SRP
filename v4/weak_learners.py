@@ -42,6 +42,7 @@ __all__ = [
     "make_feature_subsets",
     "WeakLearnerMLP",
     "WeakLearnerEnsemble",
+    "SharedWeightEnsemble",
 ]
 
 ACTIVATIONS = {
@@ -87,6 +88,10 @@ class WeakLearnerConfig:
     ensure_coverage: bool = True
     bias: bool = True
     seed: int = 42
+    # shared=True swaps WeakLearnerEnsemble for SharedWeightEnsemble: K BatchEnsemble
+    # members over one shared weight per layer (TabM, arXiv:2410.24210). Default False
+    # keeps the original K-independent-MLPs architecture bit-for-bit.
+    shared: bool = False
     batched: bool = False
     gate: FeatureGateConfig = field(default_factory=FeatureGateConfig)
 
@@ -262,6 +267,129 @@ class WeakLearnerMLP(nn.Module):
 # ---------------------------------------------------------------------------
 # The ensemble
 # ---------------------------------------------------------------------------
+class SharedWeightEnsemble(nn.Module):
+    """K BatchEnsemble members over ONE shared weight per layer -> (B, K, embed_dim).
+
+    A drop-in sibling of WeakLearnerEnsemble: same constructor, same output contract, so
+    attention.py, model.py's aggregators and the heads need no changes at all.
+
+    TabM (Gorishniy, Kotelnikov & Babenko, ICLR 2025, arXiv:2410.24210) sec 3.2 writes
+    member i's layer as
+
+        l_i(x) = s_i * (W (r_i * x)) + b_i        <=>        W_i = W (*) (s_i r_i^T)
+
+    with W shared and r_i, s_i, b_i per member. So K FULL-WIDTH members cost one W plus
+    K*(in + 2*out) adapter numbers instead of K separate weight matrices. The paper's
+    claim is that this is also a regulariser: members are individually overfitted but
+    their average generalises, and TabM_naive (shared) beats TabM_packed (K independent
+    MLPs, i.e. what WeakLearnerEnsemble builds).
+
+    TWO DELIBERATE DIFFERENCES FROM WeakLearnerEnsemble
+    ---------------------------------------------------
+    1. Feature bagging is a 0/1 MASK over the full feature vector, never a slice. Slicing
+       is what WeakLearnerEnsemble does and it CANNOT be combined with a shared W: after
+       slicing, input position j is a different actual feature for each member, so one
+       shared weight matrix would be reading inconsistent columns and the comparison would
+       measure nothing. The mask keeps every member's input in the same coordinate system.
+       feature_frac=1.0 (no masking) is TabM's own setting, where members differ only
+       through their adapters -- that is the faithful replication; masking on top is the
+       "does our feature bagging add anything to TabM?" variant.
+    2. No feature gating. FeatureGate was measured not to help (step 9) and composing it
+       with a learned per-member input scale r_i would be two input modulations doing the
+       same job; a non-default gate raises rather than being silently ignored.
+    """
+
+    def __init__(self, in_dim: int, config: Optional[WeakLearnerConfig] = None,
+                 in_per_feature: int = 1, **overrides):
+        super().__init__()
+        if config is None:
+            config = WeakLearnerConfig(**overrides)
+        elif overrides:
+            config = WeakLearnerConfig(**{**config.__dict__, **overrides})
+        if config.gate.mode != "none":
+            raise ValueError("SharedWeightEnsemble does not support feature gating; r_i is "
+                             "already a learned per-member input scale (see class docstring)")
+
+        self.config = config
+        self.in_dim = in_dim
+        self.in_per_feature = in_per_feature
+        self.num_learners = K = config.num_learners
+        self.embed_dim = config.embed_dim
+
+        # Same subsets as the independent ensemble would draw, so the two are comparable --
+        # but applied as a mask over the FULL vector instead of a slice.
+        self._subsets = make_feature_subsets(
+            in_dim, K, feature_frac=config.feature_frac, seed=config.seed,
+            ensure_coverage=config.ensure_coverage,
+        )
+        mask = torch.zeros(K, in_dim)
+        for i, idx in enumerate(self._subsets):
+            mask[i, idx] = 1.0
+        if in_per_feature > 1:
+            # Each feature arrives as in_per_feature numbers, so its mask bit repeats.
+            mask = mask.repeat_interleave(in_per_feature, dim=1)
+        self.register_buffer("mask", mask, persistent=True)
+        self.masking = config.feature_frac < 1.0
+
+        dims = [in_dim * in_per_feature] + [config.hidden_dim] * config.depth + [config.embed_dim]
+        # nn.Linear holds the shared W so its initialisation is exactly PyTorch's default,
+        # identical to what the independent experts get for a layer of the same shape.
+        self.shared = nn.ModuleList([nn.Linear(dims[i], dims[i + 1], bias=False)
+                                     for i in range(len(dims) - 1)])
+        self.R = nn.ParameterList([nn.Parameter(torch.ones(K, dims[i]))
+                                   for i in range(len(dims) - 1)])
+        self.S = nn.ParameterList([nn.Parameter(torch.ones(K, dims[i + 1]))
+                                   for i in range(len(dims) - 1)])
+        self.bias = nn.ParameterList([nn.Parameter(torch.zeros(K, dims[i + 1]))
+                                      for i in range(len(dims) - 1)]) if config.bias else None
+        # TabM sec 3.3: "initialize all multiplicative adapters R and S, except for the very
+        # first one, deterministically with 1". Without this one random adapter every member
+        # computes the identical function and the ensemble is a single model.
+        with torch.no_grad():
+            self.R[0].copy_(torch.randint(0, 2, (K, dims[0]), dtype=torch.float32) * 2 - 1)
+
+        self.act = ACTIVATIONS[config.activation]()
+        self.drop = nn.Dropout(config.dropout) if config.dropout > 0 else None
+
+    # -- introspection (same surface WeakLearnerEnsemble exposes) ------------
+    @property
+    def feature_subsets(self) -> List[np.ndarray]:
+        return [np.asarray(idx) for idx in self._subsets]
+
+    def coverage(self) -> Dict[str, object]:
+        counts = np.zeros(self.in_dim, dtype=np.int64)
+        for idx in self._subsets:
+            counts[idx] += 1
+        return {"counts": counts, "uncovered": np.flatnonzero(counts == 0).tolist(),
+                "features_per_learner": int(len(self._subsets[0])),
+                "min_times_seen": int(counts.min()), "max_times_seen": int(counts.max())}
+
+    def num_parameters(self, trainable_only: bool = True) -> int:
+        return sum(p.numel() for p in self.parameters()
+                   if p.requires_grad or not trainable_only)
+
+    # -- forward -------------------------------------------------------------
+    def forward(self, x: torch.Tensor, x_raw: Optional[torch.Tensor] = None) -> torch.Tensor:
+        """(B, in_dim) or (B, in_dim, d) -> (B, K, embed_dim). `x_raw` is accepted for
+        interface parity with WeakLearnerEnsemble (feature gating) and ignored."""
+        if x.dim() not in (2, 3):
+            raise ValueError(f"expected (B, in_dim) or (B, in_dim, d) input, got {tuple(x.shape)}")
+        h = x.flatten(1) if x.dim() == 3 else x                   # (B, F*d)
+        h = h.unsqueeze(1).expand(-1, self.num_learners, -1)      # (B, K, F*d)
+        if self.masking:
+            h = h * self.mask
+        last = len(self.shared) - 1
+        for i, lin in enumerate(self.shared):
+            h = torch.einsum("bki,oi->bko", h * self.R[i], lin.weight) * self.S[i]
+            if self.bias is not None:
+                h = h + self.bias[i]
+            if i != last:                 # no activation on the output embedding, as in
+                h = self.act(h)           # WeakLearnerMLP
+                if self.drop is not None:
+                    h = self.drop(h)
+        return h
+
+
 class WeakLearnerEnsemble(nn.Module):
     """K feature-bagged weak learners -> a token sequence (B, K, embed_dim).
 
@@ -501,3 +629,80 @@ if __name__ == "__main__":
     with torch.no_grad():
         same = torch.allclose(ens(x), ens_b(x), atol=1e-5)
     print(f"\nbatched forward == loop forward (eval mode): {same}")
+
+    # -----------------------------------------------------------------------
+    # SharedWeightEnsemble (TabM-style BatchEnsemble). PASS/FAIL checks.
+    # -----------------------------------------------------------------------
+    print("\nSHARED-WEIGHT ENSEMBLE (TabM, arXiv:2410.24210)")
+    checks = []
+    sc = WeakLearnerConfig(num_learners=16, hidden_dim=16, embed_dim=32, depth=1,
+                           feature_frac=0.7, seed=0, dropout=0.0, shared=True)
+    se = SharedWeightEnsemble(IN_DIM, sc)
+    out_s = se(x)
+    checks.append(("output is (B, K, embed_dim), same contract as WeakLearnerEnsemble",
+                   out_s.shape == (x.shape[0], 16, 32)))
+
+    # The adapters are the ONLY source of member diversity here. TabM randomises the first
+    # R and sets every other adapter to 1; with that one tensor also set to 1, all K members
+    # must compute the identical function -- which is what makes it the diversity mechanism.
+    se_flat = SharedWeightEnsemble(IN_DIM, WeakLearnerConfig(**{**sc.__dict__,
+                                                               "feature_frac": 1.0}))
+    with torch.no_grad():
+        se_flat.R[0].fill_(1.0)
+    se_flat.eval()
+    with torch.no_grad():
+        o_flat = se_flat(x)
+    collapsed = torch.allclose(o_flat[:, 0], o_flat[:, 5], atol=1e-6)
+    se.eval()
+    with torch.no_grad():
+        o_div = se(x)
+    diverse = not torch.allclose(o_div[:, 0], o_div[:, 5], atol=1e-6)
+    checks.append(("all-ones adapters collapse every member to one function, and TabM's "
+                   "random first R breaks that", collapsed and diverse))
+
+    # Every parameter group must train, or the arm is secretly a smaller model.
+    se.train(); se.zero_grad()
+    se(x).sum().backward()
+    groups = {"shared W": [l.weight for l in se.shared], "R": list(se.R),
+              "S": list(se.S), "bias": list(se.bias)}
+    all_grad = all(p.grad is not None and p.grad.abs().sum() > 0
+                   for ps in groups.values() for p in ps)
+    checks.append((f"shared W, R, S and bias all receive nonzero gradient "
+                   f"({sum(len(v) for v in groups.values())} tensors)", all_grad))
+
+    # Masking must actually remove a feature from a member that does not own it.
+    owner = se.feature_subsets
+    dropped = next(j for j in range(IN_DIM) if j not in owner[0])
+    x2 = x.clone(); x2[:, dropped] += 100.0
+    se.eval()
+    with torch.no_grad():
+        unchanged = torch.allclose(se(x)[:, 0], se(x2)[:, 0], atol=1e-5)
+        moved = not torch.allclose(se(x), se(x2), atol=1e-5)
+    checks.append((f"a masked-out feature (col {dropped}) cannot influence member 0, but "
+                   f"does move other members", unchanged and moved))
+    checks.append(("feature_frac=1.0 disables masking entirely (TabM's own setting)",
+                   se_flat.masking is False and bool(se_flat.mask.all())))
+
+    # shared=False must leave the original architecture untouched, bit for bit.
+    base = WeakLearnerConfig(**{**sc.__dict__, "shared": False})
+    torch.manual_seed(0); a = WeakLearnerEnsemble(IN_DIM, base)
+    torch.manual_seed(0); b = WeakLearnerEnsemble(IN_DIM, WeakLearnerConfig(**base.__dict__))
+    a.eval(); b.eval()
+    with torch.no_grad():
+        checks.append(("shared=False is the default and still builds the original "
+                       "K-independent-MLP ensemble, bit-identical",
+                       base.shared is False and torch.equal(a(x), b(x))))
+
+    for msg, ok in checks:
+        print(f"  [{'PASS' if ok else 'FAIL'}] {msg}")
+
+    # The point of weight sharing: width stops multiplying the parameter count, so the
+    # savings can be spent on making each member FULL-SIZED (TabM tunes width 64..1024).
+    print("\n  parameters vs expert width (K=16, embed_dim=32, depth=1):")
+    print(f"  {'hidden':>7s} {'independent':>13s} {'shared':>10s} {'ratio':>7s}")
+    for hd in (16, 64, 256, 512):
+        kw = {**sc.__dict__, "hidden_dim": hd}
+        ind = WeakLearnerEnsemble(IN_DIM, WeakLearnerConfig(**{**kw, "shared": False}))
+        shd = SharedWeightEnsemble(IN_DIM, WeakLearnerConfig(**kw))
+        print(f"  {hd:7d} {ind.num_parameters():13,d} {shd.num_parameters():10,d} "
+              f"{ind.num_parameters()/shd.num_parameters():6.1f}x")

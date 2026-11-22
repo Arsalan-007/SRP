@@ -84,6 +84,10 @@ PALETTE = {
     "conf_dynamic": YELLOW,
     "conf_sigmoid": MAGENTA,
     "conf_gumbel": RED,
+    # Per-expert accountability (expert_loss_beta). AQUA/GREEN are free in this family —
+    # bidirectional and gate never appear in the same plot as a beta sweep.
+    "expert_beta": GREEN,
+    "conf_beta": AQUA,
 }
 
 _ALIASES = {
@@ -94,6 +98,7 @@ _ALIASES = {
     "conf uniform": "conf_uniform", "conf static": "conf_static", "conf dynamic": "conf_dynamic",
     "confidence (static)": "conf_static", "confidence (dynamic)": "conf_dynamic",
     "conf sigmoid": "conf_sigmoid", "conf gumbel": "conf_gumbel",
+    "expert beta": "expert_beta", "conf beta": "conf_beta",
 }
 
 

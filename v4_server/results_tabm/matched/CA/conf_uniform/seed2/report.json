@@ -1,0 +1,47 @@
+{
+  "dataset": "CA",
+  "label": "California Housing",
+  "arm": "conf_uniform",
+  "seed": 2,
+  "source": "reproduced",
+  "source_ref": "cli.py",
+  "config": {
+    "ens": {
+      "num_learners": 32,
+      "hidden_dim": 128,
+      "embed_dim": 32,
+      "depth": 1,
+      "dropout": 0.1,
+      "activation": "gelu",
+      "feature_frac": 1.0,
+      "ensure_coverage": true,
+      "bias": true,
+      "shared": true
+    },
+    "emb": {
+      "mode": "periodic",
+      "d_embedding": 8,
+      "n_frequencies": 16,
+      "sigma": 0.1
+    },
+    "train": {
+      "epochs": 200,
+      "patience": 20,
+      "lr": 0.001,
+      "batch_size": 512,
+      "weight_decay": 0.0001
+    },
+    "expert_loss_beta": 0.0
+  },
+  "n_parameters": 32065,
+  "metrics": {
+    "test": {
+      "rmse": 0.4717300978218697
+    }
+  },
+  "champion_metric": "test_rmse",
+  "champion_value": 0.4717300978218697,
+  "higher_is_better": false,
+  "time_seconds": 18.267916917800903,
+  "checkpoint": null
+}

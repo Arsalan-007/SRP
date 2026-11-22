@@ -53,6 +53,7 @@ def run_arm(dataset: str, arm: str, seeds=(0,), embedding: str = "none",
             epochs: int = 400, patience: int = 20, lr: float = 1e-3,
             batch_size: int = 512, weight_decay: float = 1e-4,
             subsample: int = 0, out_dir=None, device=None,
+            expert_loss_beta: float = 0.0,
             quiet: bool = False, **ens_overrides) -> Dict:
     """Train `arm` on `dataset` once per seed. Returns the per-seed scores and the summary.
 
@@ -95,7 +96,8 @@ def run_arm(dataset: str, arm: str, seeds=(0,), embedding: str = "none",
                          WeakLearnerConfig(**ens_kw, seed=seed, batched=True),
                          AttentionConfig(embed_dim=ens_kw["embed_dim"], num_heads=4, attn_depth=2),
                          task=data_obj.task, output_dim=data_obj.output_dim,
-                         embedding=EmbeddingConfig(**emb_kw))
+                         embedding=EmbeddingConfig(**emb_kw),
+                         expert_loss_beta=expert_loss_beta)
         t0 = time.time()
         model, hist = train_model(model, tensors, seed=seed, **train_kw)
         test = evaluate(model, tensors["Xte"], arrays["yte"], data_obj.task)
@@ -110,7 +112,8 @@ def run_arm(dataset: str, arm: str, seeds=(0,), embedding: str = "none",
                         dataset=dataset, label=data_obj.label, arm=arm, seed=seed,
                         source="reproduced", source_ref="cli.py"
                         + (" [SUBSAMPLED]" if subsample else ""),
-                        config={"ens": ens_kw, "emb": emb_kw, "train": train_kw},
+                        config={"ens": ens_kw, "emb": emb_kw, "train": train_kw,
+                                "expert_loss_beta": expert_loss_beta},
                         n_parameters=row["n_parameters"],
                         metrics={"test": {metric: row["score"]}},
                         champion_metric=f"test_{metric}", champion_value=row["score"],
@@ -127,6 +130,7 @@ def run_arm(dataset: str, arm: str, seeds=(0,), embedding: str = "none",
     undertrained = [r["seed"] for r in rows if r["best_epoch"] > epochs - patience]
     summary = {"dataset": dataset, "label": data_obj.label, "arm": arm,
                "embedding": embedding, "metric": metric,
+               "expert_loss_beta": expert_loss_beta,
                "higher_is_better": higher_is_better,
                "mean": float(scores.mean()), "std": float(scores.std(ddof=1)) if len(scores) > 1 else 0.0,
                "n_parameters": rows[0]["n_parameters"], "runs": rows,
@@ -155,6 +159,15 @@ def main(argv=None) -> int:
     ap.add_argument("--num-learners", type=int, default=DEFAULTS["num_learners"])
     ap.add_argument("--feature-frac", type=float, default=DEFAULTS["feature_frac"])
     ap.add_argument("--embed-dim", type=int, default=DEFAULTS["embed_dim"])
+    ap.add_argument("--hidden-dim", type=int, default=DEFAULTS["hidden_dim"],
+                    help="width of each expert. With --shared this is nearly free, which is "
+                         "the whole point of weight sharing (TabM tunes 64..1024).")
+    ap.add_argument("--shared", action="store_true",
+                    help="TabM-style BatchEnsemble: K members over one shared weight per "
+                         "layer instead of K independent MLPs. Default off (unchanged).")
+    ap.add_argument("--beta", type=float, default=0.0,
+                    help="expert_loss_beta: weight on the per-expert loss term. "
+                         "Required (>0) for --arm expert_beta / conf_beta, ignored by others.")
     ap.add_argument("--subsample", type=int, default=0, help="rows per split, for a smoke test")
     ap.add_argument("--out", default=None, help="results dir for report.json (default: none)")
     ap.add_argument("--device", default=None, help="cuda / cpu (default: auto)")
@@ -178,7 +191,8 @@ def main(argv=None) -> int:
                       weight_decay=a.weight_decay, subsample=a.subsample, out_dir=a.out,
                       device=a.device, quiet=a.json,
                       num_learners=a.num_learners, feature_frac=a.feature_frac,
-                      embed_dim=a.embed_dim)
+                      embed_dim=a.embed_dim, hidden_dim=a.hidden_dim, shared=a.shared,
+                      expert_loss_beta=a.beta)
     if a.json:
         print(json.dumps(summary, indent=2))
     return 0
@@ -200,6 +214,16 @@ def _self_test() -> int:
         except Exception:
             raised = False
         ok.append((f"an unknown {bad} raises ValueError before any training starts", raised))
+    # A beta arm without --beta must fail loudly here, not train the wrong loss branch
+    # for an hour on the GPU and report it under the wrong arm name.
+    try:
+        run_arm(dataset="CA", arm="expert_beta", seeds=(0,), epochs=1, quiet=True)
+        beta_guarded = False
+    except ValueError:
+        beta_guarded = True
+    except Exception:
+        beta_guarded = False
+    ok.append(("--arm expert_beta without --beta raises ValueError before training", beta_guarded))
     ok.append(("--list exits 0", main(["--list"]) == 0))
     for msg, passed in ok:
         print(f"  [{'PASS' if passed else 'FAIL'}] {msg}")

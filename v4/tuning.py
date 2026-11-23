@@ -48,7 +48,12 @@ __all__ = ["NN_ARMS", "STEP3_DEFAULTS", "suggest_params", "build_model", "run_co
            "create_study", "optuna_worker", "tune_xgb", "make_xgb", "xgb_metrics",
            "load_study"]
 
-NN_ARMS = ("meanpool", "causal")
+NN_ARMS = ("meanpool", "causal", "conf_uniform")
+
+# Arms that pool at the OUTPUT level and share one head across experts. They take the same
+# capacity knobs as meanpool (head width/depth) but no attention knobs.
+_OUTPUT_POOL_ARMS = ("conf_uniform", "conf_static", "conf_dynamic", "conf_sigmoid",
+                     "conf_gumbel", "expert_beta", "conf_beta")
 
 # The step-3 configurations, expressed in this module's parameter format.
 # The expert fields come from weak_learners.default_ens() so they cannot drift from the
@@ -64,20 +69,37 @@ STEP3_DEFAULTS = {
 # ---------------------------------------------------------------------------
 # Search space & model construction
 # ---------------------------------------------------------------------------
-def suggest_params(trial: optuna.Trial, arm: str, k_range=(2, 64)) -> Dict:
+def suggest_params(trial: optuna.Trial, arm: str, k_range=(2, 64), wide: bool = False,
+                   search_shared: bool = False) -> Dict:
+    """Sample one configuration.
+
+    wide: widen the capacity knobs (hidden_dim, embed_dim, depth, head width). The narrow
+        default is what notebooks 09-19 searched and is kept so re-running them reproduces.
+        Covertype showed capacity is the binding constraint there (+1.73% from hidden
+        16 -> 256, notebook 20), so a "what is the ceiling?" search must set wide=True —
+        otherwise it reports the ceiling of the cap, not of the architecture.
+    search_shared: let Optuna choose the TabM-style shared weight matrix with rank-1
+        per-expert adapters (weak_learners.SharedWeightEnsemble) instead of independent
+        experts. Notebook 20 found this wins on Covertype and loses on CA/HI, so the right
+        choice is per-dataset — which is exactly what a per-dataset search is for.
+    """
+    hi_hidden, hi_head = (512, 512) if wide else (64, 256)
+    embed_choices = [16, 32, 64, 128, 256] if wide else [16, 32, 64]
     p = {
         "num_learners": trial.suggest_int("num_learners", k_range[0], k_range[1], log=True),
-        "hidden_dim":   trial.suggest_int("hidden_dim", 8, 64, log=True),
-        "embed_dim":    trial.suggest_categorical("embed_dim", [16, 32, 64]),
-        "depth":        trial.suggest_int("depth", 1, 2),
+        "hidden_dim":   trial.suggest_int("hidden_dim", 8, hi_hidden, log=True),
+        "embed_dim":    trial.suggest_categorical("embed_dim", embed_choices),
+        "depth":        trial.suggest_int("depth", 1, 3 if wide else 2),
         "feature_frac": trial.suggest_float("feature_frac", 0.3, 1.0),
         "dropout":      trial.suggest_float("dropout", 0.0, 0.3),
         "lr":           trial.suggest_float("lr", 3e-4, 3e-3, log=True),
         "weight_decay": trial.suggest_float("weight_decay", 1e-6, 1e-3, log=True),
     }
-    if arm == "meanpool":
-        # The head is mean-pool's only aggregation capacity, so its size is searched.
-        p["head_hidden"] = trial.suggest_int("head_hidden", 32, 256, log=True)
+    if search_shared:
+        p["shared"] = trial.suggest_categorical("shared", [False, True])
+    if arm == "meanpool" or arm in _OUTPUT_POOL_ARMS:
+        # The head is the only aggregation capacity these arms have, so its size is searched.
+        p["head_hidden"] = trial.suggest_int("head_hidden", 32, hi_head, log=True)
         p["head_depth"] = trial.suggest_int("head_depth", 1, 2)
     elif arm == "causal":
         p["num_heads"] = trial.suggest_categorical("num_heads", [2, 4])
@@ -133,7 +155,8 @@ def build_model(arm: str, params: Dict, in_dim: int, seed: int, task: str = "reg
     ens = WeakLearnerConfig(num_learners=params["num_learners"], hidden_dim=params["hidden_dim"],
                             embed_dim=params["embed_dim"], depth=params["depth"],
                             dropout=params["dropout"], feature_frac=params["feature_frac"],
-                            seed=seed, batched=batched, gate=_gate_config(params))
+                            seed=seed, batched=batched, gate=_gate_config(params),
+                            shared=params.get("shared", False))
     torch.manual_seed(seed)
     emb = _embedding_config(params)
     if arm == "meanpool":
@@ -162,7 +185,10 @@ def build_model(arm: str, params: Dict, in_dim: int, seed: int, task: str = "reg
         # restating every config here. Opt into beta via params["expert_loss_beta"].
         return make_arm(arm, in_dim, ens, None, task=task, output_dim=output_dim,
                         embedding=emb, bin_edges=bin_edges,
-                        expert_loss_beta=params.get("expert_loss_beta", 0.0))
+                        expert_loss_beta=params.get("expert_loss_beta", 0.0),
+                        head_hidden=params.get("head_hidden"),
+                        head_depth=params.get("head_depth", 1),
+                        head_dropout=params.get("dropout", 0.1))
     if arm == "causal":
         att = AttentionConfig(embed_dim=params["embed_dim"], num_heads=params["num_heads"],
                               attn_depth=params["attn_depth"], dropout=params["dropout"],
@@ -231,8 +257,13 @@ def load_study(study_name: str, storage_path: str) -> optuna.Study:
 def optuna_worker(arm: str, study_name: str, storage_path: str, n_trials: int, worker_seed: int,
                   arrays: Dict[str, np.ndarray], task: str = "regression", output_dim: int = 1,
                   threads: int = 2, trial_epochs: int = 150, trial_patience: int = 15,
-                  project_dir: Optional[str] = None) -> int:
-    """Run `n_trials` trials of a shared study inside one worker process."""
+                  project_dir: Optional[str] = None, wide: bool = False,
+                  search_shared: bool = False, max_params: Optional[int] = None) -> int:
+    """Run `n_trials` trials of a shared study inside one worker process.
+
+    max_params: prune before training any model above this parameter count. With wide=True
+        the space reaches ~22M-parameter models whose trials cost hours, which would eat the
+        budget without being informative; the cap keeps every trial comparably priced."""
     if project_dir and project_dir not in sys.path:
         sys.path.insert(0, project_dir)
     torch.set_num_threads(threads)
@@ -243,9 +274,12 @@ def optuna_worker(arm: str, study_name: str, storage_path: str, n_trials: int, w
     in_dim = data["Xtr"].shape[1]
 
     def objective(trial: optuna.Trial) -> float:
-        params = suggest_params(trial, arm)
+        params = suggest_params(trial, arm, wide=wide, search_shared=search_shared)
         model = build_model(arm, params, in_dim, seed=0, task=task, output_dim=output_dim)
-        trial.set_user_attr("n_params", model.num_parameters())
+        n_params = model.num_parameters()
+        trial.set_user_attr("n_params", n_params)
+        if max_params is not None and n_params > max_params:
+            raise optuna.TrialPruned()
 
         def report(epoch, val_loss):
             trial.report(val_loss, epoch)

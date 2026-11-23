@@ -492,6 +492,9 @@ def make_arm(name: str, in_dim: int, ensemble_config: WeakLearnerConfig,
              ncl_detach_mean: bool = False,
              conf_tau: float = 1.0,
              expert_loss_beta: float = 0.0,
+             head_hidden: Optional[int] = None,
+             head_depth: int = 1,
+             head_dropout: float = 0.1,
              bin_edges=None) -> SRPModel:
     """Build one arm of the ablation. Set torch.manual_seed(seed) right before calling
     this to get identical expert weights across arms for that seed.
@@ -518,17 +521,21 @@ def make_arm(name: str, in_dim: int, ensemble_config: WeakLearnerConfig,
         mode = {"conf_uniform": "uniform", "conf_static": "static", "conf_dynamic": "dynamic",
                 "conf_sigmoid": "sigmoid", "conf_gumbel": "gumbel"}[name]
         cfg = SRPConfig(aggregator="meanpool", pool_level="output", confidence=mode,
-                        conf_tau=conf_tau, **common)
+                        conf_tau=conf_tau, head_hidden=head_hidden, head_depth=head_depth,
+                        head_dropout=head_dropout, **common)
     elif name == "expert_beta":
         # Per-expert accountability alone, no router. Compare against conf_uniform (beta=0).
         cfg = SRPConfig(aggregator="meanpool", pool_level="output",
-                        expert_loss_beta=expert_loss_beta, **common)
+                        expert_loss_beta=expert_loss_beta, head_hidden=head_hidden,
+                        head_depth=head_depth, head_dropout=head_dropout, **common)
     elif name == "conf_beta":
         # The full MoE recipe: beta creates competence differences, the dynamic router exploits
         # them. Compare against expert_beta to isolate the router's contribution, and against
         # conf_dynamic (notebooks 17/18, null) to see whether beta is what the router was missing.
         cfg = SRPConfig(aggregator="meanpool", pool_level="output", confidence="dynamic",
-                        conf_tau=conf_tau, expert_loss_beta=expert_loss_beta, **common)
+                        conf_tau=conf_tau, expert_loss_beta=expert_loss_beta,
+                        head_hidden=head_hidden, head_depth=head_depth,
+                        head_dropout=head_dropout, **common)
     elif name == "bidirectional":
         cfg = SRPConfig(aggregator="bidirectional", readout="last", **common)
     elif name == "causal":

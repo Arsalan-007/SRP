@@ -1,0 +1,17 @@
+{
+  "num_learners": 25,
+  "hidden_dim": 8,
+  "embed_dim": 256,
+  "depth": 2,
+  "feature_frac": 0.4374959420527955,
+  "dropout": 0.08748814755091086,
+  "lr": 0.0004020245649489896,
+  "weight_decay": 4.722097028003638e-06,
+  "shared": false,
+  "head_hidden": 158,
+  "head_depth": 1,
+  "embedding_mode": "periodic",
+  "d_embedding": 8,
+  "n_frequencies": 16,
+  "sigma": 0.19738045205599639
+}

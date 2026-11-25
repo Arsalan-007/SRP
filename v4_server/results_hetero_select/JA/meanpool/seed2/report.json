@@ -1,0 +1,46 @@
+{
+  "dataset": "JA",
+  "label": "Jannis",
+  "arm": "meanpool",
+  "seed": 2,
+  "source": "reproduced",
+  "source_ref": "notebook 20 (hetero_select)",
+  "config": {
+    "ens": {
+      "num_learners": 16,
+      "hidden_dim": 16,
+      "embed_dim": 32,
+      "depth": 1,
+      "dropout": 0.1,
+      "activation": "gelu",
+      "feature_frac": 0.7,
+      "ensure_coverage": true,
+      "bias": true,
+      "shared": false
+    },
+    "emb": {
+      "mode": "periodic",
+      "d_embedding": 8,
+      "n_frequencies": 16,
+      "sigma": 0.1
+    },
+    "train": {
+      "epochs": 400,
+      "patience": 20,
+      "lr": 0.001,
+      "batch_size": 512,
+      "weight_decay": 0.0001
+    }
+  },
+  "n_parameters": 103156,
+  "metrics": {
+    "test": {
+      "acc": 0.721263509882367
+    }
+  },
+  "champion_metric": "test_acc",
+  "champion_value": 0.721263509882367,
+  "higher_is_better": true,
+  "time_seconds": 19.65451145172119,
+  "checkpoint": null
+}

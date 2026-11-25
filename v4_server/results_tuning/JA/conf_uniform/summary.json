@@ -1,0 +1,36 @@
+{
+  "dataset": "JA",
+  "label": "Jannis",
+  "arm": "conf_uniform",
+  "task": "multiclass",
+  "metric": "acc",
+  "higher_is_better": true,
+  "mean": 0.7259449453633487,
+  "std": 0.0017396651564703283,
+  "per_seed": [
+    0.7261599092374754,
+    0.7259210604884457,
+    0.7284289723532573,
+    0.7235325729981489,
+    0.725682211739416
+  ],
+  "n_parameters": 33544,
+  "best_params": {
+    "num_learners": 14,
+    "hidden_dim": 27,
+    "embed_dim": 256,
+    "depth": 1,
+    "feature_frac": 0.6813578265178096,
+    "dropout": 0.20589315902649472,
+    "lr": 0.0006224599666071911,
+    "weight_decay": 7.223724814531257e-05,
+    "shared": true,
+    "head_hidden": 50,
+    "head_depth": 2,
+    "embedding_mode": "none"
+  },
+  "n_trials": 102,
+  "best_val_loss": 0.6642400671215374,
+  "search_minutes": 33.61971874237061,
+  "final_minutes": 3.9925721764564512
+}

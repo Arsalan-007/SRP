@@ -1,0 +1,181 @@
+{
+  "dataset": "CO",
+  "label": "Covertype",
+  "arm": "hetero_select",
+  "seed": 0,
+  "source": "reproduced",
+  "source_ref": "notebook 20 (hetero_select)",
+  "config": {
+    "ens": {
+      "num_learners": 16,
+      "hidden_dim": 16,
+      "embed_dim": 32,
+      "depth": 1,
+      "dropout": 0.1,
+      "activation": "gelu",
+      "feature_frac": 0.7,
+      "ensure_coverage": true,
+      "bias": true,
+      "shared": false
+    },
+    "emb": {
+      "mode": "periodic",
+      "d_embedding": 8,
+      "n_frequencies": 16,
+      "sigma": 0.1
+    },
+    "train": {
+      "epochs": 400,
+      "patience": 20,
+      "lr": 0.001,
+      "batch_size": 512,
+      "weight_decay": 0.0001
+    },
+    "het": {
+      "expert_patience": 10,
+      "hidden_dim": 16,
+      "embed_dim": 32,
+      "d_embedding": 8,
+      "n_frequencies": 16,
+      "activation": "gelu"
+    },
+    "expert_hparams": [
+      {
+        "depth": 1,
+        "dropout": 0.2410957007139991,
+        "lr": 0.0030360440246111385,
+        "weight_decay": 7.068556336646726e-05,
+        "sigma": 0.01324734583991599
+      },
+      {
+        "depth": 1,
+        "dropout": 0.0,
+        "lr": 0.002799580384252393,
+        "weight_decay": 0.0019828128212094225,
+        "sigma": 2.0773429479979653
+      },
+      {
+        "depth": 1,
+        "dropout": 0.0,
+        "lr": 0.0002040085459607216,
+        "weight_decay": 0.009422315850591615,
+        "sigma": 0.016171348740123975
+      },
+      {
+        "depth": 3,
+        "dropout": 0.0,
+        "lr": 0.002840321022638364,
+        "weight_decay": 9.508842866518123e-05,
+        "sigma": 0.945554661914885
+      },
+      {
+        "depth": 3,
+        "dropout": 0.16981884181764428,
+        "lr": 0.0015872317595420824,
+        "weight_decay": 0.000280225898561165,
+        "sigma": 0.012744350111586561
+      },
+      {
+        "depth": 3,
+        "dropout": 0.0,
+        "lr": 0.000977009453557576,
+        "weight_decay": 0.023423131490513914,
+        "sigma": 0.03946709566655739
+      },
+      {
+        "depth": 1,
+        "dropout": 0.0,
+        "lr": 0.00013386580634551203,
+        "weight_decay": 9.517367493915683e-05,
+        "sigma": 0.025113905593824235
+      },
+      {
+        "depth": 2,
+        "dropout": 0.0905037551368515,
+        "lr": 0.0005430041137472742,
+        "weight_decay": 1.181878442071438e-05,
+        "sigma": 1.1866252491453608
+      },
+      {
+        "depth": 3,
+        "dropout": 0.0,
+        "lr": 0.004525248105348394,
+        "weight_decay": 0.042185456010489814,
+        "sigma": 0.08987417090577988
+      },
+      {
+        "depth": 3,
+        "dropout": 0.3144127786223625,
+        "lr": 0.0001486221243397695,
+        "weight_decay": 0.004489177158718668,
+        "sigma": 6.778957045786138
+      },
+      {
+        "depth": 1,
+        "dropout": 0.2829944152845352,
+        "lr": 0.0005617332960335062,
+        "weight_decay": 3.549969557712904e-05,
+        "sigma": 0.043714908471014224
+      },
+      {
+        "depth": 3,
+        "dropout": 0.0,
+        "lr": 0.00010687550925007483,
+        "weight_decay": 6.742984981556238e-05,
+        "sigma": 0.011898975852803428
+      },
+      {
+        "depth": 3,
+        "dropout": 0.0,
+        "lr": 0.00035225075572789896,
+        "weight_decay": 0.001732061238360663,
+        "sigma": 3.9449067660969015
+      },
+      {
+        "depth": 2,
+        "dropout": 0.02896026639759347,
+        "lr": 0.0006074342454632615,
+        "weight_decay": 9.889729479651763e-05,
+        "sigma": 0.1403765699679303
+      },
+      {
+        "depth": 1,
+        "dropout": 0.0,
+        "lr": 0.000517743437521968,
+        "weight_decay": 0.016237619650190133,
+        "sigma": 0.4129074282553227
+      },
+      {
+        "depth": 2,
+        "dropout": 0.0,
+        "lr": 0.004853028546481487,
+        "weight_decay": 0.06762616829776315,
+        "sigma": 0.29981415084754454
+      }
+    ],
+    "selected_experts": [
+      3,
+      5,
+      3,
+      5,
+      3,
+      13,
+      3,
+      5
+    ]
+  },
+  "n_parameters": 283264,
+  "metrics": {
+    "test": {
+      "acc": 0.8705369052434102
+    },
+    "test_average_all": {
+      "acc": 0.8424395239365593
+    }
+  },
+  "champion_metric": "test_acc",
+  "champion_value": 0.8705369052434102,
+  "higher_is_better": true,
+  "time_seconds": 3143.0597200393677,
+  "checkpoint": null
+}

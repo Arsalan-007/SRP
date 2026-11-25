@@ -1,0 +1,39 @@
+{
+  "dataset": "SA",
+  "label": "Santander",
+  "arm": "conf_uniform",
+  "task": "binary",
+  "metric": "acc",
+  "higher_is_better": true,
+  "mean": 0.9238899999999999,
+  "std": 0.00022817208418210165,
+  "per_seed": [
+    0.9241,
+    0.923925,
+    0.9241,
+    0.923575,
+    0.92375
+  ],
+  "n_parameters": 296077,
+  "best_params": {
+    "num_learners": 25,
+    "hidden_dim": 8,
+    "embed_dim": 256,
+    "depth": 2,
+    "feature_frac": 0.4374959420527955,
+    "dropout": 0.08748814755091086,
+    "lr": 0.0004020245649489896,
+    "weight_decay": 4.722097028003638e-06,
+    "shared": false,
+    "head_hidden": 158,
+    "head_depth": 1,
+    "embedding_mode": "periodic",
+    "d_embedding": 8,
+    "n_frequencies": 16,
+    "sigma": 0.19738045205599639
+  },
+  "n_trials": 60,
+  "best_val_loss": 0.20260385978221893,
+  "search_minutes": 22.35380700826645,
+  "final_minutes": 3.994046215216319
+}

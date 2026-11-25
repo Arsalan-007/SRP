@@ -1,0 +1,15 @@
+{
+  "num_learners": 6,
+  "hidden_dim": 287,
+  "embed_dim": 256,
+  "depth": 1,
+  "feature_frac": 0.689944996244014,
+  "dropout": 0.05581785346623218,
+  "lr": 0.0029809301326629237,
+  "weight_decay": 4.146894036105686e-05,
+  "shared": true,
+  "head_hidden": 37,
+  "head_depth": 1,
+  "embedding_mode": "linear",
+  "d_embedding": 16
+}

@@ -1,0 +1,37 @@
+{
+  "dataset": "CA",
+  "label": "California Housing",
+  "arm": "conf_uniform",
+  "task": "regression",
+  "metric": "rmse",
+  "higher_is_better": false,
+  "mean": 0.46340242643587376,
+  "std": 0.00754718389939457,
+  "per_seed": [
+    0.458694549508143,
+    0.4530625483618859,
+    0.464492922954598,
+    0.4700886170892758,
+    0.47067349426546645
+  ],
+  "n_parameters": 206033,
+  "best_params": {
+    "num_learners": 48,
+    "hidden_dim": 74,
+    "embed_dim": 32,
+    "depth": 1,
+    "feature_frac": 0.5558496362777133,
+    "dropout": 0.06377391562398729,
+    "lr": 0.0017155596258977216,
+    "weight_decay": 1.2338137745179021e-06,
+    "shared": true,
+    "head_hidden": 400,
+    "head_depth": 2,
+    "embedding_mode": "linear",
+    "d_embedding": 16
+  },
+  "n_trials": 120,
+  "best_val_loss": 0.16576257348060608,
+  "search_minutes": 13.91708852450053,
+  "final_minutes": 1.654640293121338
+}

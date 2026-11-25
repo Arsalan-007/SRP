@@ -1,0 +1,40 @@
+15:22:34 device cuda | 3 workers x 2 threads | 4 datasets x 1 arms = 400 trials
+15:22:34 space: WIDE (hidden<=512) | shared weights searched | final 5 seeds x 200 epochs | log results/tuning/tune_all_20261123_152234.log
+15:22:34 === CA ===
+15:22:34   CA/conf_uniform: California Housing | 13,209 train rows | 8 features | regression | 0 trials done, 120 to go
+15:22:34 device cuda | 3 workers x 2 threads | 4 datasets x 1 arms = 240 trials
+15:22:34 space: WIDE (hidden<=512) | shared weights searched | final 5 seeds x 200 epochs | log results/tuning/tune_all_20261123_152234.log
+15:22:34 === JA ===
+15:22:36   JA/conf_uniform: Jannis | 53,588 train rows | 54 features | multiclass | 0 trials done, 100 to go
+15:35:54   JA/conf_uniform: search 13.3 min | {'COMPLETE': 78, 'PRUNED': 24} | best val loss 0.6778
+15:36:30   CA/conf_uniform: search 13.9 min | {'PRUNED': 65, 'COMPLETE': 55} | best val loss 0.1658
+15:37:30   JA/conf_uniform: DONE acc 0.7199 +/- 0.0012 (16,354 params, final 1.6 min)
+15:37:30 === FB ===
+15:37:34   FB/conf_uniform: Facebook Comments | 157,638 train rows | 131 features | regression | 0 trials done, 60 to go
+15:38:09   CA/conf_uniform: DONE rmse 0.4634 +/- 0.0075 (206,033 params, final 1.7 min)
+15:38:09 === AD ===
+15:38:09   AD/conf_uniform: Adult | 26,048 train rows | 108 features | binary | 0 trials done, 120 to go
+15:48:53   AD/conf_uniform: search 10.7 min | {'COMPLETE': 117, 'PRUNED': 3} | best val loss 0.2965
+15:49:32   AD/conf_uniform: DONE acc 0.8637 +/- 0.0018 (245,316 params, final 0.6 min)
+15:49:32 === HI ===
+15:49:32   HI/conf_uniform: Higgs Small | 62,751 train rows | 28 features | binary | 0 trials done, 100 to go
+16:18:59   HI/conf_uniform: search 29.4 min | {'COMPLETE': 66, 'PRUNED': 36} | best val loss 0.5274
+16:22:08   HI/conf_uniform: DONE acc 0.7211 +/- 0.0017 (84,411 params, final 3.2 min)
+16:22:08 === SA ===
+16:22:19   SA/conf_uniform: Santander | 128,000 train rows | 200 features | binary | 0 trials done, 60 to go
+16:26:16   FB/conf_uniform: search 48.7 min | {'COMPLETE': 53, 'PRUNED': 7} | best val loss 0.1645
+16:32:24   FB/conf_uniform: DONE rmse 5.8053 +/- 0.0965 (710,089 params, final 6.1 min)
+16:32:24 === CO ===
+16:32:29   CO/conf_uniform: Covertype | 371,847 train rows | 54 features | multiclass | 0 trials done, 40 to go
+16:44:40   SA/conf_uniform: search 22.4 min | {'COMPLETE': 60} | best val loss 0.2026
+16:48:40   SA/conf_uniform: DONE acc 0.9239 +/- 0.0002 (296,077 params, final 4.0 min)
+16:48:40 
+wrote results/tuning/summary_CA_AD_HI_SA.csv
+17:54:59   CO/conf_uniform: search 82.5 min | {'COMPLETE': 34, 'PRUNED': 8} | best val loss 0.0983
+18:17:19   CO/conf_uniform: DONE acc 0.9638 +/- 0.0020 (693,267 params, final 22.3 min)
+18:17:19 === YE ===
+18:17:30   YE/conf_uniform: YearPredictionMSD | 370,972 train rows | 90 features | regression | 0 trials done, 40 to go
+19:00:44   YE/conf_uniform: search 43.2 min | {'COMPLETE': 41, 'PRUNED': 1} | best val loss 0.6073
+19:13:50   YE/conf_uniform: DONE rmse 8.8655 +/- 0.0379 (1,575,931 params, final 13.1 min)
+19:13:50 
+wrote results/tuning/summary_JA_FB_CO_YE.csv

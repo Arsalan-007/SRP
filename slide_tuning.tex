@@ -1,0 +1,127 @@
+% =====================================================================
+% Standalone slides: per-dataset Optuna tuning across all 8 benchmarks
+% ("What is our architecture's true ceiling?").  Compiles on its own.
+%
+%   pdflatex slide_tuning.tex
+%   pdflatex slide_tuning.tex     % second pass for the frame counter
+%
+% Numbers from v4_server/results_tuning/<KEY>/conf_uniform/summary.json
+% (5 seeds per dataset; 40-120 Optuna trials each; 15.9 GPU-hours total).
+% CA/AD/FB/SA from the 2026-11-23 run; JA/HI/YE/CO re-run 2026-11-24 with the
+% search and final epoch budgets matched at 200.
+% =====================================================================
+\documentclass[aspectratio=169, xcolor=table]{beamer}
+
+% colortbl provides \rowcolor and \cellcolor. xcolor=table normally loads it; loading it
+% explicitly costs nothing and makes this file portable across TeX distributions.
+\usepackage{colortbl}
+
+% ---------------------------------------------------
+% CUSTOM COLORS & TYPOGRAPHY  (matching the main deck)
+% ---------------------------------------------------
+\definecolor{PrimaryColor}{RGB}{12, 45, 89}    % Deep Corporate Blue
+\definecolor{SecondaryColor}{RGB}{0, 163, 224} % Lighter Accent Blue
+\definecolor{LightGrey}{RGB}{240, 242, 245}
+\definecolor{WinGreen}{RGB}{216, 245, 227}
+\definecolor{LossRed}{RGB}{251, 218, 218}
+
+\usefonttheme{professionalfonts}
+\renewcommand{\familydefault}{\sfdefault}
+
+% ---------------------------------------------------
+% BEAMER STYLING OVERRIDES
+% ---------------------------------------------------
+\setbeamertemplate{navigation symbols}{}
+\setbeamertemplate{itemize items}[circle]
+\setbeamercolor{structure}{fg=PrimaryColor}
+\setbeamercolor{frametitle}{bg=PrimaryColor, fg=white}
+\setbeamercolor{title}{bg=PrimaryColor, fg=white}
+\setbeamercolor{block title}{bg=SecondaryColor, fg=white}
+\setbeamercolor{block body}{bg=LightGrey, fg=black}
+
+\setbeamertemplate{footline}{
+   \leavevmode%
+   \hbox{%
+   \begin{beamercolorbox}[wd=.5\paperwidth,ht=2.25ex,dp=1ex,left]{title in head/foot}%
+     \hspace*{2ex}\usebeamerfont{title in head/foot}\insertshorttitle
+   \end{beamercolorbox}%
+   \begin{beamercolorbox}[wd=.5\paperwidth,ht=2.25ex,dp=1ex,right]{date in head/foot}%
+     \usebeamerfont{date in head/foot}\insertframenumber{} / \inserttotalframenumber\hspace*{2ex}
+   \end{beamercolorbox}}%
+   \vskip0pt%
+}
+
+\title[Bagged Expert Ensembles]{Per-Dataset Tuning: The Architecture's Ceiling}
+\author{Arsalan Jawed}
+\institute{University of Hildesheim}
+\date{\today}
+
+\begin{document}
+
+% =====================================================================
+\begin{frame}{Question 5: What Is Our Architecture's Ceiling?}
+    \small
+    \textbf{Test:} every benchmark gets its own Optuna search (40--120 trials, TPE with median
+    pruning), over a \textbf{widened} space --- up to 512 hidden units, 256 embedding dimensions,
+    depth 3 --- with TabM-style weight sharing as one more searchable choice.
+    Best configuration re-trained on \textbf{5 seeds}.
+    \vspace{0.05cm}
+    \begin{table}
+        \centering
+        \renewcommand{\arraystretch}{1.08}
+        \scriptsize
+        \begin{tabular}{l | c | c | c | c | c}
+            \rowcolor{PrimaryColor} \color{white}\textbf{Dataset} & \color{white}\textbf{Untuned v4} & \color{white}\textbf{Tuned} & \color{white}\textbf{Change} & \color{white}\textbf{Best published NN} & \color{white}\textbf{XGBoost} \\
+            California Housing (RMSE$\downarrow$) & 0.5404 & \textbf{0.4634} & \cellcolor{WinGreen}$+14.25\%$ & 0.459 \,{\scriptsize FT-T} & 0.431 \\
+            \rowcolor{LightGrey} Adult (accuracy$\uparrow$) & 0.8589 & \textbf{0.8637} & \cellcolor{WinGreen}$+0.56\%$ & 0.859 \,{\scriptsize FT-T} & 0.8739 \\
+            Jannis (accuracy$\uparrow$) & 0.7195 & \textbf{0.7259} & \cellcolor{WinGreen}$+0.90\%$ & 0.732 \,{\scriptsize FT-T} & 0.7233 \\
+            \rowcolor{LightGrey} Higgs Small (accuracy$\uparrow$) & 0.7215 & \textbf{0.7239} & \cellcolor{WinGreen}$+0.33\%$ & 0.728 \,{\scriptsize MLP-PLR} & 0.7255 \\
+            YearPredictionMSD (RMSE$\downarrow$) & 8.8293 & 8.8655 & \cellcolor{LossRed}$-0.41\%$ & 8.784 \,{\scriptsize NODE} & 8.819 \\
+            \rowcolor{LightGrey} Covertype (accuracy$\uparrow$) & 0.9324 & \textbf{0.9686} & \cellcolor{WinGreen}$+3.88\%$ & 0.964 \,{\scriptsize ResNet} & 0.9689 \\
+            Facebook Comments (RMSE$\downarrow$) & 5.9443 & \textbf{5.8053} & \cellcolor{WinGreen}$+2.34\%$ & 5.525 \,{\scriptsize MLP-PLR} & 5.383 \\
+            \rowcolor{LightGrey} Santander (accuracy$\uparrow$) & 0.9147 & \textbf{0.9239} & \cellcolor{WinGreen}$+1.00\%$ & 0.924 \,{\scriptsize MLP-PLR} & 0.9235 \\
+        \end{tabular}
+    \end{table}
+    \vspace{-0.1cm}
+    \textbf{Result:} tuning improves \textbf{7 of 8}. \textbf{Covertype} reaches $0.9686$ ---
+    above the best published neural network ($0.964$) and within $0.0003$ of tuned XGBoost.
+    \textbf{Jannis} ($0.7259$) and \textbf{Santander} ($0.9239$) also beat tuned XGBoost.\\[0.08cm]
+    \tiny Only YearPrediction still regresses. An earlier version of this search ranked trials
+    under a shorter epoch budget than the final re-train, which cost accuracy on Jannis and Higgs;
+    with search and final matched at 200 epochs both now improve. YearPrediction reproduced its
+    previous result exactly, so its regression is real and not a budget artefact.
+\end{frame}
+
+% =====================================================================
+\begin{frame}{What the Search Chose --- and What It Settled}
+    \small
+    \begin{table}
+        \centering
+        \renewcommand{\arraystretch}{1.08}
+        \scriptsize
+        \begin{tabular}{l | c | c | c | c | c}
+            \rowcolor{PrimaryColor} \color{white}\textbf{Dataset} & \color{white}\textbf{Experts $K$} & \color{white}\textbf{Width} & \color{white}\textbf{Weights} & \color{white}\textbf{Embeddings} & \color{white}\textbf{Parameters} \\
+            California Housing & 48 & 74 & shared & linear & 206{,}033 \\
+            \rowcolor{LightGrey} Adult & 9 & 49 & shared & PLR & 245{,}316 \\
+            Jannis & 14 & 27 & shared & none & 33{,}544 \\
+            \rowcolor{LightGrey} Higgs Small & 29 & 166 & shared & none & 104{,}601 \\
+            YearPredictionMSD & 31 & 108 & independent & none & 1{,}575{,}931 \\
+            \rowcolor{LightGrey} Covertype & 9 & 361 & shared & PLR & 681{,}530 \\
+            Facebook Comments & 6 & 287 & shared & linear & 710{,}089 \\
+            \rowcolor{LightGrey} Santander & 25 & 8 & independent & PLR & 296{,}077 \\
+        \end{tabular}
+    \end{table}
+    \vspace{-0.05cm}
+    \begin{block}{Few wide experts or many narrow ones --- the data decides}
+        Optuna chose TabM-style \textbf{sharing on 6 of 8} datasets, and the chosen shape varies by
+        two orders of magnitude: $48$ experts of width $74$ on California Housing against
+        $9$ of width $361$ on Covertype. Covertype's search was \textbf{still improving at its
+        final trial}, so $0.9686$ is a lower bound, not a ceiling.
+    \end{block}
+    \vspace{-0.1cm}
+    \tiny Embeddings were also searched: PLR won on 3 of 8 datasets, plain linear on 2, and none at all on 3 ---
+    reproducing our earlier finding that PLR hurts on YearPrediction. Caveat: the tuned Covertype configuration
+    changes sharing \emph{and} width together, so this search does not separate the two.
+\end{frame}
+
+\end{document}

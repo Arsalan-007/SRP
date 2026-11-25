@@ -1,0 +1,178 @@
+{
+  "dataset": "AD",
+  "label": "Adult",
+  "arm": "homo_select",
+  "seed": 4,
+  "source": "reproduced",
+  "source_ref": "notebook 20 (hetero_select)",
+  "config": {
+    "ens": {
+      "num_learners": 16,
+      "hidden_dim": 16,
+      "embed_dim": 32,
+      "depth": 1,
+      "dropout": 0.1,
+      "activation": "gelu",
+      "feature_frac": 0.7,
+      "ensure_coverage": true,
+      "bias": true,
+      "shared": false
+    },
+    "emb": {
+      "mode": "periodic",
+      "d_embedding": 8,
+      "n_frequencies": 16,
+      "sigma": 0.1
+    },
+    "train": {
+      "epochs": 400,
+      "patience": 20,
+      "lr": 0.001,
+      "batch_size": 512,
+      "weight_decay": 0.0001
+    },
+    "het": {
+      "expert_patience": 10,
+      "hidden_dim": 16,
+      "embed_dim": 32,
+      "d_embedding": 8,
+      "n_frequencies": 16,
+      "activation": "gelu"
+    },
+    "expert_hparams": [
+      {
+        "depth": 1,
+        "dropout": 0.1,
+        "lr": 0.001,
+        "weight_decay": 0.0001,
+        "sigma": 0.1
+      },
+      {
+        "depth": 1,
+        "dropout": 0.1,
+        "lr": 0.001,
+        "weight_decay": 0.0001,
+        "sigma": 0.1
+      },
+      {
+        "depth": 1,
+        "dropout": 0.1,
+        "lr": 0.001,
+        "weight_decay": 0.0001,
+        "sigma": 0.1
+      },
+      {
+        "depth": 1,
+        "dropout": 0.1,
+        "lr": 0.001,
+        "weight_decay": 0.0001,
+        "sigma": 0.1
+      },
+      {
+        "depth": 1,
+        "dropout": 0.1,
+        "lr": 0.001,
+        "weight_decay": 0.0001,
+        "sigma": 0.1
+      },
+      {
+        "depth": 1,
+        "dropout": 0.1,
+        "lr": 0.001,
+        "weight_decay": 0.0001,
+        "sigma": 0.1
+      },
+      {
+        "depth": 1,
+        "dropout": 0.1,
+        "lr": 0.001,
+        "weight_decay": 0.0001,
+        "sigma": 0.1
+      },
+      {
+        "depth": 1,
+        "dropout": 0.1,
+        "lr": 0.001,
+        "weight_decay": 0.0001,
+        "sigma": 0.1
+      },
+      {
+        "depth": 1,
+        "dropout": 0.1,
+        "lr": 0.001,
+        "weight_decay": 0.0001,
+        "sigma": 0.1
+      },
+      {
+        "depth": 1,
+        "dropout": 0.1,
+        "lr": 0.001,
+        "weight_decay": 0.0001,
+        "sigma": 0.1
+      },
+      {
+        "depth": 1,
+        "dropout": 0.1,
+        "lr": 0.001,
+        "weight_decay": 0.0001,
+        "sigma": 0.1
+      },
+      {
+        "depth": 1,
+        "dropout": 0.1,
+        "lr": 0.001,
+        "weight_decay": 0.0001,
+        "sigma": 0.1
+      },
+      {
+        "depth": 1,
+        "dropout": 0.1,
+        "lr": 0.001,
+        "weight_decay": 0.0001,
+        "sigma": 0.1
+      },
+      {
+        "depth": 1,
+        "dropout": 0.1,
+        "lr": 0.001,
+        "weight_decay": 0.0001,
+        "sigma": 0.1
+      },
+      {
+        "depth": 1,
+        "dropout": 0.1,
+        "lr": 0.001,
+        "weight_decay": 0.0001,
+        "sigma": 0.1
+      },
+      {
+        "depth": 1,
+        "dropout": 0.1,
+        "lr": 0.001,
+        "weight_decay": 0.0001,
+        "sigma": 0.1
+      }
+    ],
+    "selected_experts": [
+      9,
+      3,
+      9,
+      4,
+      9
+    ]
+  },
+  "n_parameters": 523536,
+  "metrics": {
+    "test": {
+      "acc": 0.8611264664332657
+    },
+    "test_average_all": {
+      "acc": 0.8602665683926048
+    }
+  },
+  "champion_metric": "test_acc",
+  "champion_value": 0.8611264664332657,
+  "higher_is_better": true,
+  "time_seconds": 80.50893902778625,
+  "checkpoint": null
+}

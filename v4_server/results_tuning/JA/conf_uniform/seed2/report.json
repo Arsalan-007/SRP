@@ -1,0 +1,40 @@
+{
+  "dataset": "JA",
+  "label": "Jannis",
+  "arm": "conf_uniform",
+  "seed": 2,
+  "source": "reproduced",
+  "source_ref": "tune_all.py (Optuna-tuned)",
+  "config": {
+    "best_params": {
+      "num_learners": 14,
+      "hidden_dim": 27,
+      "embed_dim": 256,
+      "depth": 1,
+      "feature_frac": 0.6813578265178096,
+      "dropout": 0.20589315902649472,
+      "lr": 0.0006224599666071911,
+      "weight_decay": 7.223724814531257e-05,
+      "shared": true,
+      "head_hidden": 50,
+      "head_depth": 2,
+      "embedding_mode": "none"
+    },
+    "wide": true,
+    "search_shared": true,
+    "trials": 100,
+    "epochs": 200,
+    "patience": 20
+  },
+  "n_parameters": 33544,
+  "metrics": {
+    "test": {
+      "acc": 0.7284289723532573
+    }
+  },
+  "champion_metric": "test_acc",
+  "champion_value": 0.7284289723532573,
+  "higher_is_better": true,
+  "time_seconds": 122.2753164768219,
+  "checkpoint": null
+}

@@ -1,0 +1,33 @@
+23:42:56 device cuda | 3 workers x 2 threads | 3 datasets x 1 arms = 240 trials
+23:42:56 space: WIDE (hidden<=512) | shared weights searched | search and final both 200-200 epochs | final 5 seeds | log results/tuning/tune_all_20261123_234256_3809852.log
+23:42:56 === JA ===
+[I 2026-11-23 23:42:58,632] A new study created in Journal with name: JA_conf_uniform
+23:42:58   JA/conf_uniform: Jannis | 53,588 train rows | 54 features | multiclass | 0 trials done, 100 to go
+00:16:36   JA/conf_uniform: search 33.6 min | {'COMPLETE': 55, 'PRUNED': 47} | best val loss 0.6642
+00:20:35   JA/conf_uniform: DONE acc 0.7259 +/- 0.0017 (33,544 params, final 4.0 min)
+00:20:35 === HI ===
+[I 2026-11-24 00:20:36,883] A new study created in Journal with name: HI_conf_uniform
+00:20:36   HI/conf_uniform: Higgs Small | 62,751 train rows | 28 features | binary | 0 trials done, 100 to go
+/media/homes/latif/SRP/v4/training.py:55: UserWarning: The given NumPy array is not writable, and PyTorch does not support non-writable tensors. This means writing to this tensor will result in undefined behavior. You may want to copy the array to protect its data or make it writable before converting it to a tensor. This type of warning will be suppressed for the rest of this program. (Triggered internally at /__w/pytorch/pytorch/torch/csrc/utils/tensor_numpy.cpp:213.)
+  return {k: torch.as_tensor(np.ascontiguousarray(v)).to(dev) for k, v in arrays.items()}
+/media/homes/latif/SRP/v4/training.py:55: UserWarning: The given NumPy array is not writable, and PyTorch does not support non-writable tensors. This means writing to this tensor will result in undefined behavior. You may want to copy the array to protect its data or make it writable before converting it to a tensor. This type of warning will be suppressed for the rest of this program. (Triggered internally at /__w/pytorch/pytorch/torch/csrc/utils/tensor_numpy.cpp:213.)
+  return {k: torch.as_tensor(np.ascontiguousarray(v)).to(dev) for k, v in arrays.items()}
+/media/homes/latif/SRP/v4/training.py:55: UserWarning: The given NumPy array is not writable, and PyTorch does not support non-writable tensors. This means writing to this tensor will result in undefined behavior. You may want to copy the array to protect its data or make it writable before converting it to a tensor. This type of warning will be suppressed for the rest of this program. (Triggered internally at /__w/pytorch/pytorch/torch/csrc/utils/tensor_numpy.cpp:213.)
+  return {k: torch.as_tensor(np.ascontiguousarray(v)).to(dev) for k, v in arrays.items()}
+00:49:16   HI/conf_uniform: search 28.7 min | {'PRUNED': 61, 'COMPLETE': 41} | best val loss 0.5272
+00:53:17   HI/conf_uniform: DONE acc 0.7239 +/- 0.0034 (104,601 params, final 4.0 min)
+00:53:17 === YE ===
+[I 2026-11-24 00:53:27,861] A new study created in Journal with name: YE_conf_uniform
+00:53:27   YE/conf_uniform: YearPredictionMSD | 370,972 train rows | 90 features | regression | 0 trials done, 40 to go
+02:20:29   YE/conf_uniform: search 87.0 min | {'COMPLETE': 38, 'PRUNED': 4} | best val loss 0.6073
+/media/homes/latif/SRP/v4/training.py:55: UserWarning: The given NumPy array is not writable, and PyTorch does not support non-writable tensors. This means writing to this tensor will result in undefined behavior. You may want to copy the array to protect its data or make it writable before converting it to a tensor. This type of warning will be suppressed for the rest of this program. (Triggered internally at /__w/pytorch/pytorch/torch/csrc/utils/tensor_numpy.cpp:213.)
+  return {k: torch.as_tensor(np.ascontiguousarray(v)).to(dev) for k, v in arrays.items()}
+/media/homes/latif/SRP/v4/training.py:55: UserWarning: The given NumPy array is not writable, and PyTorch does not support non-writable tensors. This means writing to this tensor will result in undefined behavior. You may want to copy the array to protect its data or make it writable before converting it to a tensor. This type of warning will be suppressed for the rest of this program. (Triggered internally at /__w/pytorch/pytorch/torch/csrc/utils/tensor_numpy.cpp:213.)
+  return {k: torch.as_tensor(np.ascontiguousarray(v)).to(dev) for k, v in arrays.items()}
+02:33:12   YE/conf_uniform: DONE rmse 8.8655 +/- 0.0379 (1,575,931 params, final 12.7 min)
+02:33:12 
+wrote results/tuning/summary_JA_HI_YE.csv
+dataset             label          arm       task metric  higher_is_better     mean      std  n_parameters  n_trials  best_val_loss  search_minutes  final_minutes
+     JA            Jannis conf_uniform multiclass    acc              True 0.725945 0.001740         33544       102       0.664240       33.619719       3.992572
+     HI       Higgs Small conf_uniform     binary    acc              True 0.723876 0.003435        104601       102       0.527241       28.652594       4.018167
+     YE YearPredictionMSD conf_uniform regression   rmse             False 8.865489 0.037853       1575931        42       0.607293       87.025894      12.715280

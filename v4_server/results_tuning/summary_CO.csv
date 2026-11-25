@@ -1,0 +1,2 @@
+dataset,label,arm,task,metric,higher_is_better,mean,std,n_parameters,n_trials,best_val_loss,search_minutes,final_minutes
+CO,Covertype,conf_uniform,multiclass,acc,True,0.9686204314862783,0.0010182245768587882,681530,120,0.08469223510868688,638.931807076931,37.15091327826182

@@ -1,0 +1,40 @@
+{
+  "dataset": "HI",
+  "label": "Higgs Small",
+  "arm": "conf_uniform",
+  "seed": 4,
+  "source": "reproduced",
+  "source_ref": "tune_all.py (Optuna-tuned)",
+  "config": {
+    "best_params": {
+      "num_learners": 29,
+      "hidden_dim": 166,
+      "embed_dim": 128,
+      "depth": 1,
+      "feature_frac": 0.32200733148735317,
+      "dropout": 0.23396785310753032,
+      "lr": 0.00042422391703313345,
+      "weight_decay": 0.0001498515479912073,
+      "shared": true,
+      "head_hidden": 429,
+      "head_depth": 1,
+      "embedding_mode": "none"
+    },
+    "wide": true,
+    "search_shared": true,
+    "trials": 100,
+    "epochs": 200,
+    "patience": 20
+  },
+  "n_parameters": 104601,
+  "metrics": {
+    "test": {
+      "acc": 0.72697603263641
+    }
+  },
+  "champion_metric": "test_acc",
+  "champion_value": 0.72697603263641,
+  "higher_is_better": true,
+  "time_seconds": 106.10205054283142,
+  "checkpoint": null
+}

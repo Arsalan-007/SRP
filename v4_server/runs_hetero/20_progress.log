@@ -1,0 +1,107 @@
+13:07:42 device: cuda (NVIDIA RTX A4000) | keys=['CA', 'AD', 'JA', 'HI', 'YE', 'CO'] | arms=['meanpool', 'homo_select', 'hetero_select'] | seeds=5 | epochs<=400 patience=20 | 3 workers
+13:07:42 90 runs total
+13:07:53   model.py     exit 0, 29 PASS, 0 FAIL
+13:08:08   hetero.py    exit 0, 11 PASS, 0 FAIL
+13:08:08 self-tests passed
+13:08:08 [small ] CA California Housing regression features=  8 train=13,209 val=3,303 test=4,128
+13:08:09 [small ] AD Adult              binary     features=108 train=26,048 val=6,513 test=16,281  classes=2
+13:08:11 [medium] JA Jannis             multiclass features= 54 train=53,588 val=13,398 test=16,747  classes=4
+13:08:12 [medium] HI Higgs Small        binary     features= 28 train=62,751 val=15,688 test=19,610  classes=2
+13:08:23 [large ] YE YearPredictionMSD  regression features= 90 train=370,972 val=92,743 test=51,630
+13:08:28 [large ] CO Covertype          multiclass features= 54 train=371,847 val=92,962 test=116,203  classes=7
+13:08:29 search space: HeteroSpace(depth=(1, 3), dropout_zero_prob=0.5, dropout=(0.0, 0.5), lr=(0.0001, 0.005), weight_decay=(1e-05, 0.1), sigma=(0.01, 10.0))
+13:08:29 homo_select / control settings: {'depth': 1, 'dropout': 0.1, 'lr': 0.001, 'weight_decay': 0.0001, 'sigma': 0.1}
+13:08:29 90 runs on 3 workers (cuda) ...
+13:21:25   [  1/90] YE homo_select   seed 0  rmse 8.7863  avg-all 8.8357  members 16 (10 distinct)  best epoch  34/ 34  (12.9 min)  elapsed 12.9 min
+13:22:42   [  2/90] YE homo_select   seed 1  rmse 8.7932  avg-all 8.8641  members 15 (8 distinct)  best epoch  29/ 34  (14.1 min)  elapsed 14.2 min
+13:22:42   [  3/90] YE homo_select   seed 2  rmse 8.8016  avg-all 8.8541  members 16 (9 distinct)  best epoch  26/ 31  (12.5 min)  elapsed 14.2 min
+13:35:19   [  4/90] YE homo_select   seed 3  rmse 8.8037  avg-all 8.8954  members 12 (8 distinct)  best epoch  29/ 40  (14.2 min)  elapsed 26.8 min
+13:35:19   [  5/90] YE homo_select   seed 4  rmse 8.8036  avg-all 8.8765  members 16 (8 distinct)  best epoch  33/ 36  (13.4 min)  elapsed 26.8 min
+13:41:09   [  6/90] YE hetero_select seed 0  rmse 8.7865  avg-all 8.8797  members 10 (7 distinct)  best epoch 114/118  (18.4 min)  elapsed 32.7 min
+13:55:41   [  7/90] YE hetero_select seed 1  rmse 8.8213  avg-all 8.9129  members 8 (7 distinct)  best epoch  90/ 96  (20.8 min)  elapsed 47.2 min
+13:55:41   [  8/90] YE hetero_select seed 2  rmse 8.8688  avg-all 8.9718  members 10 (6 distinct)  best epoch  62/ 82  (18.5 min)  elapsed 47.2 min
+13:55:41   [  9/90] YE hetero_select seed 3  rmse 8.8368  avg-all 9.0133  members 4 (3 distinct)  best epoch  48/ 49  (14.5 min)  elapsed 47.2 min
+14:09:18   [ 10/90] YE hetero_select seed 4  rmse 8.8207  avg-all 8.9444  members 4 (4 distinct)  best epoch  66/ 72  (15.5 min)  elapsed 60.8 min
+14:32:50   [ 11/90] CO homo_select   seed 0  acc 0.8363  avg-all 0.8316  members 5 (4 distinct)  best epoch  98/118  (37.1 min)  elapsed 84.3 min
+14:35:20   [ 12/90] CO homo_select   seed 1  acc 0.8435  avg-all 0.8357  members 7 (5 distinct)  best epoch 114/128  (39.6 min)  elapsed 86.9 min
+14:53:44   [ 13/90] CO homo_select   seed 2  acc 0.8433  avg-all 0.8324  members 5 (5 distinct)  best epoch 109/129  (44.4 min)  elapsed 105.3 min
+15:12:18   [ 14/90] CO homo_select   seed 3  acc 0.8451  avg-all 0.8394  members 12 (6 distinct)  best epoch  96/104  (39.5 min)  elapsed 123.8 min
+15:14:00   [ 15/90] CO homo_select   seed 4  acc 0.8428  avg-all 0.8228  members 4 (3 distinct)  best epoch 123/133  (38.7 min)  elapsed 125.5 min
+15:46:07   [ 16/90] CO hetero_select seed 0  acc 0.8705  avg-all 0.8424  members 8 (3 distinct)  best epoch 126/146  (52.4 min)  elapsed 157.6 min
+16:36:21   [ 17/90] CO hetero_select seed 1  acc 0.8727  avg-all 0.8412  members 4 (3 distinct)  best epoch 287/293  (84.0 min)  elapsed 207.9 min
+16:36:21   [ 18/90] CO hetero_select seed 2  acc 0.8710  avg-all 0.8387  members 5 (3 distinct)  best epoch 198/218  (63.6 min)  elapsed 207.9 min
+16:54:20   [ 19/90] CO hetero_select seed 3  acc 0.8732  avg-all 0.8451  members 7 (5 distinct)  best epoch 287/307  (68.2 min)  elapsed 225.8 min
+17:30:56   [ 20/90] CO hetero_select seed 4  acc 0.8697  avg-all 0.8395  members 6 (4 distinct)  best epoch 165/185  (73.4 min)  elapsed 262.4 min
+17:30:56   [ 21/90] YE meanpool      seed 0  rmse 8.8330  best epoch   7/ 27  (2.1 min)  elapsed 262.4 min
+17:30:56   [ 22/90] YE meanpool      seed 1  rmse 8.8262  best epoch   6/ 26  (1.9 min)  elapsed 262.4 min
+17:30:56   [ 23/90] YE meanpool      seed 2  rmse 8.8319  best epoch   6/ 26  (2.1 min)  elapsed 262.4 min
+17:30:56   [ 24/90] YE meanpool      seed 3  rmse 8.8516  best epoch   6/ 26  (2.1 min)  elapsed 262.4 min
+17:30:56   [ 25/90] YE meanpool      seed 4  rmse 8.7808  best epoch   5/ 25  (2.1 min)  elapsed 262.4 min
+17:30:56   [ 26/90] CO meanpool      seed 0  acc 0.9494  best epoch 219/239  (18.4 min)  elapsed 262.4 min
+17:30:56   [ 27/90] CO meanpool      seed 1  acc 0.9469  best epoch 123/143  (11.3 min)  elapsed 262.4 min
+17:30:56   [ 28/90] CO meanpool      seed 2  acc 0.9503  best epoch 312/332  (25.4 min)  elapsed 262.4 min
+17:30:56   [ 29/90] CO meanpool      seed 3  acc 0.9476  best epoch 136/156  (12.0 min)  elapsed 262.4 min
+17:43:57   [ 30/90] CO meanpool      seed 4  acc 0.9499  best epoch 318/338  (26.3 min)  elapsed 275.5 min
+17:43:57   [ 31/90] JA homo_select   seed 0  acc 0.7218  avg-all 0.7206  members 14 (10 distinct)  best epoch  60/ 60  (3.2 min)  elapsed 275.5 min
+17:43:57   [ 32/90] JA homo_select   seed 1  acc 0.7231  avg-all 0.7220  members 9 (6 distinct)  best epoch  64/ 70  (3.1 min)  elapsed 275.5 min
+17:43:57   [ 33/90] JA homo_select   seed 2  acc 0.7217  avg-all 0.7231  members 10 (7 distinct)  best epoch  60/ 72  (3.7 min)  elapsed 275.5 min
+17:43:57   [ 34/90] JA homo_select   seed 3  acc 0.7240  avg-all 0.7216  members 9 (7 distinct)  best epoch  76/ 81  (3.7 min)  elapsed 275.5 min
+17:43:57   [ 35/90] JA homo_select   seed 4  acc 0.7207  avg-all 0.7193  members 9 (5 distinct)  best epoch  53/ 53  (3.3 min)  elapsed 275.5 min
+17:43:57   [ 36/90] JA hetero_select seed 0  acc 0.7238  avg-all 0.7154  members 10 (5 distinct)  best epoch  99/119  (4.7 min)  elapsed 275.5 min
+17:45:35   [ 37/90] JA hetero_select seed 1  acc 0.7216  avg-all 0.7074  members 7 (4 distinct)  best epoch  79/ 99  (5.0 min)  elapsed 277.1 min
+17:46:14   [ 38/90] JA hetero_select seed 2  acc 0.7244  avg-all 0.7059  members 4 (3 distinct)  best epoch  63/ 83  (3.7 min)  elapsed 277.7 min
+17:47:50   [ 39/90] JA hetero_select seed 3  acc 0.7220  avg-all 0.7039  members 7 (3 distinct)  best epoch  81/101  (3.9 min)  elapsed 279.3 min
+17:49:58   [ 40/90] JA hetero_select seed 4  acc 0.7204  avg-all 0.7045  members 6 (3 distinct)  best epoch 160/168  (4.4 min)  elapsed 281.5 min
+17:50:18   [ 41/90] HI homo_select   seed 0  acc 0.7213  avg-all 0.7236  members 6 (4 distinct)  best epoch  59/ 62  (4.1 min)  elapsed 281.8 min
+17:52:17   [ 42/90] HI homo_select   seed 1  acc 0.7229  avg-all 0.7263  members 7 (4 distinct)  best epoch  59/ 68  (4.5 min)  elapsed 283.8 min
+17:53:45   [ 43/90] HI homo_select   seed 2  acc 0.7217  avg-all 0.7201  members 6 (5 distinct)  best epoch  42/ 54  (3.8 min)  elapsed 285.3 min
+17:54:49   [ 44/90] HI homo_select   seed 3  acc 0.7272  avg-all 0.7235  members 12 (7 distinct)  best epoch  65/ 73  (4.5 min)  elapsed 286.3 min
+17:56:19   [ 45/90] HI homo_select   seed 4  acc 0.7253  avg-all 0.7249  members 10 (5 distinct)  best epoch  42/ 54  (4.0 min)  elapsed 287.8 min
+17:58:15   [ 46/90] HI hetero_select seed 0  acc 0.7191  avg-all 0.7160  members 4 (3 distinct)  best epoch  46/ 66  (4.5 min)  elapsed 289.8 min
+18:00:17   [ 47/90] HI hetero_select seed 1  acc 0.7190  avg-all 0.7152  members 7 (5 distinct)  best epoch  82/102  (5.5 min)  elapsed 291.8 min
+18:01:14   [ 48/90] HI hetero_select seed 2  acc 0.7150  avg-all 0.7049  members 6 (4 distinct)  best epoch  93/113  (4.9 min)  elapsed 292.8 min
+18:03:03   [ 49/90] HI hetero_select seed 3  acc 0.7246  avg-all 0.7151  members 7 (4 distinct)  best epoch 103/123  (4.8 min)  elapsed 294.6 min
+18:05:48   [ 50/90] HI hetero_select seed 4  acc 0.7217  avg-all 0.7100  members 5 (4 distinct)  best epoch 101/121  (5.5 min)  elapsed 297.3 min
+18:05:48   [ 51/90] JA meanpool      seed 0  acc 0.7193  best epoch  12/ 32  (0.3 min)  elapsed 297.3 min
+18:05:48   [ 52/90] JA meanpool      seed 1  acc 0.7215  best epoch  11/ 31  (0.3 min)  elapsed 297.3 min
+18:05:48   [ 53/90] JA meanpool      seed 2  acc 0.7213  best epoch  11/ 31  (0.3 min)  elapsed 297.3 min
+18:05:48   [ 54/90] JA meanpool      seed 3  acc 0.7176  best epoch   9/ 29  (0.3 min)  elapsed 297.3 min
+18:05:48   [ 55/90] JA meanpool      seed 4  acc 0.7176  best epoch  10/ 30  (0.3 min)  elapsed 297.3 min
+18:05:48   [ 56/90] HI meanpool      seed 0  acc 0.7247  best epoch  17/ 37  (0.5 min)  elapsed 297.3 min
+18:05:48   [ 57/90] HI meanpool      seed 1  acc 0.7276  best epoch  14/ 34  (0.4 min)  elapsed 297.3 min
+18:05:48   [ 58/90] HI meanpool      seed 2  acc 0.7241  best epoch  14/ 34  (0.4 min)  elapsed 297.3 min
+18:05:48   [ 59/90] HI meanpool      seed 3  acc 0.7249  best epoch  17/ 37  (0.4 min)  elapsed 297.3 min
+18:05:48   [ 60/90] HI meanpool      seed 4  acc 0.7239  best epoch  14/ 34  (0.4 min)  elapsed 297.3 min
+18:06:20   [ 61/90] CA homo_select   seed 0  rmse 0.4762  avg-all 0.5093  members 7 (6 distinct)  best epoch 180/200  (2.4 min)  elapsed 297.9 min
+18:06:22   [ 62/90] CA homo_select   seed 1  rmse 0.4866  avg-all 0.5269  members 5 (4 distinct)  best epoch 132/145  (2.2 min)  elapsed 297.9 min
+18:08:18   [ 63/90] CA homo_select   seed 2  rmse 0.4827  avg-all 0.4979  members 6 (4 distinct)  best epoch 215/235  (2.5 min)  elapsed 299.8 min
+18:09:04   [ 64/90] CA homo_select   seed 3  rmse 0.4814  avg-all 0.5020  members 4 (4 distinct)  best epoch 183/203  (2.7 min)  elapsed 300.6 min
+18:09:04   [ 65/90] CA homo_select   seed 4  rmse 0.4786  avg-all 0.5039  members 7 (4 distinct)  best epoch 198/208  (2.5 min)  elapsed 300.6 min
+18:10:14   [ 66/90] CA hetero_select seed 0  rmse 0.4471  avg-all 0.5219  members 6 (4 distinct)  best epoch  82/102  (1.9 min)  elapsed 301.8 min
+18:11:31   [ 67/90] CA hetero_select seed 1  rmse 0.4770  avg-all 0.5263  members 6 (5 distinct)  best epoch 159/179  (2.6 min)  elapsed 303.0 min
+18:11:31   [ 68/90] CA hetero_select seed 2  rmse 0.4766  avg-all 0.5132  members 6 (5 distinct)  best epoch 157/177  (2.4 min)  elapsed 303.0 min
+18:12:27   [ 69/90] CA hetero_select seed 3  rmse 0.4737  avg-all 0.5171  members 8 (5 distinct)  best epoch 150/170  (2.2 min)  elapsed 304.0 min
+18:13:51   [ 70/90] CA hetero_select seed 4  rmse 0.4645  avg-all 0.5196  members 7 (5 distinct)  best epoch 128/148  (2.3 min)  elapsed 305.4 min
+18:13:51   [ 71/90] AD homo_select   seed 0  acc 0.8597  avg-all 0.8598  members 9 (6 distinct)  best epoch  47/ 64  (1.4 min)  elapsed 305.4 min
+18:13:55   [ 72/90] AD homo_select   seed 1  acc 0.8624  avg-all 0.8618  members 7 (4 distinct)  best epoch  82/ 83  (1.5 min)  elapsed 305.4 min
+18:14:18   [ 73/90] AD homo_select   seed 2  acc 0.8624  avg-all 0.8619  members 10 (7 distinct)  best epoch  64/ 64  (1.3 min)  elapsed 305.8 min
+18:15:01   [ 74/90] AD homo_select   seed 3  acc 0.8604  avg-all 0.8579  members 5 (3 distinct)  best epoch  39/ 51  (1.2 min)  elapsed 306.5 min
+18:15:16   [ 75/90] AD homo_select   seed 4  acc 0.8611  avg-all 0.8603  members 5 (3 distinct)  best epoch  49/ 60  (1.3 min)  elapsed 306.8 min
+18:16:03   [ 76/90] AD hetero_select seed 0  acc 0.8657  avg-all 0.8644  members 5 (4 distinct)  best epoch  64/ 84  (1.8 min)  elapsed 307.6 min
+18:17:04   [ 77/90] AD hetero_select seed 1  acc 0.8656  avg-all 0.8638  members 3 (1 distinct)  best epoch 103/104  (2.0 min)  elapsed 308.6 min
+18:17:40   [ 78/90] AD hetero_select seed 2  acc 0.8700  avg-all 0.8689  members 6 (5 distinct)  best epoch 110/118  (2.4 min)  elapsed 309.2 min
+18:17:44   [ 79/90] AD hetero_select seed 3  acc 0.8663  avg-all 0.8635  members 7 (3 distinct)  best epoch  72/ 72  (1.7 min)  elapsed 309.3 min
+18:18:31   [ 80/90] AD hetero_select seed 4  acc 0.8698  avg-all 0.8653  members 4 (2 distinct)  best epoch  24/ 44  (1.5 min)  elapsed 310.0 min
+18:18:31   [ 81/90] CA meanpool      seed 0  rmse 0.4811  best epoch 151/171  (0.4 min)  elapsed 310.0 min
+18:18:31   [ 82/90] CA meanpool      seed 1  rmse 0.4704  best epoch 170/190  (0.6 min)  elapsed 310.0 min
+18:18:31   [ 83/90] CA meanpool      seed 2  rmse 0.4717  best epoch 115/135  (0.4 min)  elapsed 310.0 min
+18:18:52   [ 84/90] CA meanpool      seed 3  rmse 0.4773  best epoch 177/197  (0.6 min)  elapsed 310.4 min
+18:19:08   [ 85/90] CA meanpool      seed 4  rmse 0.4974  best epoch 193/213  (0.6 min)  elapsed 310.6 min
+18:19:08   [ 86/90] AD meanpool      seed 0  acc 0.8589  best epoch   8/ 28  (0.2 min)  elapsed 310.6 min
+18:19:08   [ 87/90] AD meanpool      seed 1  acc 0.8600  best epoch  19/ 39  (0.2 min)  elapsed 310.6 min
+18:19:08   [ 88/90] AD meanpool      seed 2  acc 0.8591  best epoch  13/ 33  (0.2 min)  elapsed 310.6 min
+18:19:08   [ 89/90] AD meanpool      seed 3  acc 0.8597  best epoch  14/ 34  (0.2 min)  elapsed 310.6 min
+18:19:18   [ 90/90] AD meanpool      seed 4  acc 0.8595  best epoch  20/ 40  (0.2 min)  elapsed 310.8 min
+18:19:18 all runs done in 310.8 min
+18:19:18 convergence check passed: every run early-stopped well before the 400-epoch cap
+18:19:18 Covertype: hetero_select 0.8714 vs tuned v4 (nb 09) 0.9569 -> below tuned

@@ -1,0 +1,36 @@
+{
+  "dataset": "YE",
+  "label": "YearPredictionMSD",
+  "arm": "conf_uniform",
+  "task": "regression",
+  "metric": "rmse",
+  "higher_is_better": false,
+  "mean": 8.86548909014012,
+  "std": 0.03785317047300992,
+  "per_seed": [
+    8.87246617155056,
+    8.814554533134459,
+    8.845670252779843,
+    8.915569909090033,
+    8.879184584145706
+  ],
+  "n_parameters": 1575931,
+  "best_params": {
+    "num_learners": 31,
+    "hidden_dim": 108,
+    "embed_dim": 256,
+    "depth": 2,
+    "feature_frac": 0.948633044707823,
+    "dropout": 0.188806337689214,
+    "lr": 0.00044165088065124635,
+    "weight_decay": 0.0009036073862972022,
+    "shared": false,
+    "head_hidden": 223,
+    "head_depth": 1,
+    "embedding_mode": "none"
+  },
+  "n_trials": 42,
+  "best_val_loss": 0.6072932873997126,
+  "search_minutes": 87.02589442332585,
+  "final_minutes": 12.715279881159464
+}

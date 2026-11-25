@@ -1,0 +1,180 @@
+{
+  "dataset": "CA",
+  "label": "California Housing",
+  "arm": "homo_select",
+  "seed": 4,
+  "source": "reproduced",
+  "source_ref": "notebook 20 (hetero_select)",
+  "config": {
+    "ens": {
+      "num_learners": 16,
+      "hidden_dim": 16,
+      "embed_dim": 32,
+      "depth": 1,
+      "dropout": 0.1,
+      "activation": "gelu",
+      "feature_frac": 0.7,
+      "ensure_coverage": true,
+      "bias": true,
+      "shared": false
+    },
+    "emb": {
+      "mode": "periodic",
+      "d_embedding": 8,
+      "n_frequencies": 16,
+      "sigma": 0.1
+    },
+    "train": {
+      "epochs": 400,
+      "patience": 20,
+      "lr": 0.001,
+      "batch_size": 512,
+      "weight_decay": 0.0001
+    },
+    "het": {
+      "expert_patience": 10,
+      "hidden_dim": 16,
+      "embed_dim": 32,
+      "d_embedding": 8,
+      "n_frequencies": 16,
+      "activation": "gelu"
+    },
+    "expert_hparams": [
+      {
+        "depth": 1,
+        "dropout": 0.1,
+        "lr": 0.001,
+        "weight_decay": 0.0001,
+        "sigma": 0.1
+      },
+      {
+        "depth": 1,
+        "dropout": 0.1,
+        "lr": 0.001,
+        "weight_decay": 0.0001,
+        "sigma": 0.1
+      },
+      {
+        "depth": 1,
+        "dropout": 0.1,
+        "lr": 0.001,
+        "weight_decay": 0.0001,
+        "sigma": 0.1
+      },
+      {
+        "depth": 1,
+        "dropout": 0.1,
+        "lr": 0.001,
+        "weight_decay": 0.0001,
+        "sigma": 0.1
+      },
+      {
+        "depth": 1,
+        "dropout": 0.1,
+        "lr": 0.001,
+        "weight_decay": 0.0001,
+        "sigma": 0.1
+      },
+      {
+        "depth": 1,
+        "dropout": 0.1,
+        "lr": 0.001,
+        "weight_decay": 0.0001,
+        "sigma": 0.1
+      },
+      {
+        "depth": 1,
+        "dropout": 0.1,
+        "lr": 0.001,
+        "weight_decay": 0.0001,
+        "sigma": 0.1
+      },
+      {
+        "depth": 1,
+        "dropout": 0.1,
+        "lr": 0.001,
+        "weight_decay": 0.0001,
+        "sigma": 0.1
+      },
+      {
+        "depth": 1,
+        "dropout": 0.1,
+        "lr": 0.001,
+        "weight_decay": 0.0001,
+        "sigma": 0.1
+      },
+      {
+        "depth": 1,
+        "dropout": 0.1,
+        "lr": 0.001,
+        "weight_decay": 0.0001,
+        "sigma": 0.1
+      },
+      {
+        "depth": 1,
+        "dropout": 0.1,
+        "lr": 0.001,
+        "weight_decay": 0.0001,
+        "sigma": 0.1
+      },
+      {
+        "depth": 1,
+        "dropout": 0.1,
+        "lr": 0.001,
+        "weight_decay": 0.0001,
+        "sigma": 0.1
+      },
+      {
+        "depth": 1,
+        "dropout": 0.1,
+        "lr": 0.001,
+        "weight_decay": 0.0001,
+        "sigma": 0.1
+      },
+      {
+        "depth": 1,
+        "dropout": 0.1,
+        "lr": 0.001,
+        "weight_decay": 0.0001,
+        "sigma": 0.1
+      },
+      {
+        "depth": 1,
+        "dropout": 0.1,
+        "lr": 0.001,
+        "weight_decay": 0.0001,
+        "sigma": 0.1
+      },
+      {
+        "depth": 1,
+        "dropout": 0.1,
+        "lr": 0.001,
+        "weight_decay": 0.0001,
+        "sigma": 0.1
+      }
+    ],
+    "selected_experts": [
+      15,
+      14,
+      15,
+      10,
+      15,
+      11,
+      15
+    ]
+  },
+  "n_parameters": 66576,
+  "metrics": {
+    "test": {
+      "rmse": 0.4786161462113284
+    },
+    "test_average_all": {
+      "rmse": 0.5038878929343512
+    }
+  },
+  "champion_metric": "test_rmse",
+  "champion_value": 0.4786161462113284,
+  "higher_is_better": false,
+  "time_seconds": 150.781076669693,
+  "checkpoint": null
+}

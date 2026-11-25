@@ -1,0 +1,39 @@
+{
+  "dataset": "AD",
+  "label": "Adult",
+  "arm": "conf_uniform",
+  "task": "binary",
+  "metric": "acc",
+  "higher_is_better": true,
+  "mean": 0.8637061605552484,
+  "std": 0.0018282508526671762,
+  "per_seed": [
+    0.8651802714820956,
+    0.8632147902462993,
+    0.8608807812787912,
+    0.8638290031324857,
+    0.8654259566365702
+  ],
+  "n_parameters": 245316,
+  "best_params": {
+    "num_learners": 9,
+    "hidden_dim": 49,
+    "embed_dim": 128,
+    "depth": 3,
+    "feature_frac": 0.9320243540367296,
+    "dropout": 0.26171042594765115,
+    "lr": 0.0016264722812740298,
+    "weight_decay": 2.6846268701959222e-05,
+    "shared": true,
+    "head_hidden": 61,
+    "head_depth": 2,
+    "embedding_mode": "periodic",
+    "d_embedding": 16,
+    "n_frequencies": 32,
+    "sigma": 0.8158670218972038
+  },
+  "n_trials": 120,
+  "best_val_loss": 0.2965349883788305,
+  "search_minutes": 10.720778568585713,
+  "final_minutes": 0.6486224293708801
+}

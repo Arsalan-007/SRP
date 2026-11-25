@@ -1,0 +1,40 @@
+{
+  "dataset": "FB",
+  "label": "Facebook Comments",
+  "arm": "conf_uniform",
+  "seed": 0,
+  "source": "reproduced",
+  "source_ref": "tune_all.py (Optuna-tuned)",
+  "config": {
+    "best_params": {
+      "num_learners": 6,
+      "hidden_dim": 287,
+      "embed_dim": 256,
+      "depth": 1,
+      "feature_frac": 0.689944996244014,
+      "dropout": 0.05581785346623218,
+      "lr": 0.0029809301326629237,
+      "weight_decay": 4.146894036105686e-05,
+      "shared": true,
+      "head_hidden": 37,
+      "head_depth": 1,
+      "embedding_mode": "linear",
+      "d_embedding": 16
+    },
+    "wide": true,
+    "search_shared": true,
+    "trials": 60,
+    "final_epochs": 200
+  },
+  "n_parameters": 710089,
+  "metrics": {
+    "test": {
+      "rmse": 5.913030314829369
+    }
+  },
+  "champion_metric": "test_rmse",
+  "champion_value": 5.913030314829369,
+  "higher_is_better": false,
+  "time_seconds": 205.8602249622345,
+  "checkpoint": null
+}

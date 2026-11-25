@@ -1,0 +1,8 @@
+23:42:57 device cuda | 3 workers x 2 threads | 1 datasets x 1 arms = 120 trials
+23:42:57 space: WIDE (hidden<=512) | shared weights searched | search and final both 200-200 epochs | final 5 seeds | log results/tuning/tune_all_20261123_234257_3809849.log
+23:42:57 === CO ===
+23:43:02   CO/conf_uniform: Covertype | 371,847 train rows | 54 features | multiclass | 0 trials done, 120 to go
+10:21:58   CO/conf_uniform: search 638.9 min | {'COMPLETE': 96, 'PRUNED': 24} | best val loss 0.0847
+10:59:08   CO/conf_uniform: DONE acc 0.9686 +/- 0.0010 (681,530 params, final 37.2 min)
+10:59:08 
+wrote results/tuning/summary_CO.csv

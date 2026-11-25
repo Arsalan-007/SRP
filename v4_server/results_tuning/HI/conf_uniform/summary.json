@@ -1,0 +1,36 @@
+{
+  "dataset": "HI",
+  "label": "Higgs Small",
+  "arm": "conf_uniform",
+  "task": "binary",
+  "metric": "acc",
+  "higher_is_better": true,
+  "mean": 0.7238755736868945,
+  "std": 0.00343453940490779,
+  "per_seed": [
+    0.7251912289648139,
+    0.7184599694033657,
+    0.7261091279959204,
+    0.7226415094339622,
+    0.72697603263641
+  ],
+  "n_parameters": 104601,
+  "best_params": {
+    "num_learners": 29,
+    "hidden_dim": 166,
+    "embed_dim": 128,
+    "depth": 1,
+    "feature_frac": 0.32200733148735317,
+    "dropout": 0.23396785310753032,
+    "lr": 0.00042422391703313345,
+    "weight_decay": 0.0001498515479912073,
+    "shared": true,
+    "head_hidden": 429,
+    "head_depth": 1,
+    "embedding_mode": "none"
+  },
+  "n_trials": 102,
+  "best_val_loss": 0.5272414085513655,
+  "search_minutes": 28.652593739827473,
+  "final_minutes": 4.0181668122609455
+}

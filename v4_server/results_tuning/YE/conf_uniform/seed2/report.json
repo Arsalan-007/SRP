@@ -1,0 +1,40 @@
+{
+  "dataset": "YE",
+  "label": "YearPredictionMSD",
+  "arm": "conf_uniform",
+  "seed": 2,
+  "source": "reproduced",
+  "source_ref": "tune_all.py (Optuna-tuned)",
+  "config": {
+    "best_params": {
+      "num_learners": 31,
+      "hidden_dim": 108,
+      "embed_dim": 256,
+      "depth": 2,
+      "feature_frac": 0.948633044707823,
+      "dropout": 0.188806337689214,
+      "lr": 0.00044165088065124635,
+      "weight_decay": 0.0009036073862972022,
+      "shared": false,
+      "head_hidden": 223,
+      "head_depth": 1,
+      "embedding_mode": "none"
+    },
+    "wide": true,
+    "search_shared": true,
+    "trials": 40,
+    "epochs": 200,
+    "patience": 20
+  },
+  "n_parameters": 1575931,
+  "metrics": {
+    "test": {
+      "rmse": 8.845670252779843
+    }
+  },
+  "champion_metric": "test_rmse",
+  "champion_value": 8.845670252779843,
+  "higher_is_better": false,
+  "time_seconds": 370.30453062057495,
+  "checkpoint": null
+}

@@ -1,0 +1,117 @@
+% =====================================================================
+% Standalone slides: heterogeneous experts + validation-based selection
+% (Step 19 / notebook 20).  Compiles on its own -- no main.tex needed.
+%
+%   pdflatex slide_hetero_select.tex
+%
+% Numbers from v4_server/runs_hetero/20_results_20261123_130742.csv
+% (90 runs = 6 datasets x 3 arms x 5 seeds, trained to convergence).
+% =====================================================================
+\documentclass[aspectratio=169, xcolor=table]{beamer}
+
+% colortbl provides \rowcolor. The xcolor=table option above normally loads it,
+% but loading it explicitly costs nothing and makes this file portable across
+% TeX distributions that ignore the class option.
+\usepackage{colortbl}
+
+% ---------------------------------------------------
+% CUSTOM COLORS & TYPOGRAPHY  (matching the main deck)
+% ---------------------------------------------------
+\definecolor{PrimaryColor}{RGB}{12, 45, 89}    % Deep Corporate Blue
+\definecolor{SecondaryColor}{RGB}{0, 163, 224} % Lighter Accent Blue
+\definecolor{LightGrey}{RGB}{240, 242, 245}
+
+\usefonttheme{professionalfonts}
+\renewcommand{\familydefault}{\sfdefault}
+
+% ---------------------------------------------------
+% BEAMER STYLING OVERRIDES
+% ---------------------------------------------------
+\setbeamertemplate{navigation symbols}{}
+\setbeamertemplate{itemize items}[circle]
+\setbeamercolor{structure}{fg=PrimaryColor}
+\setbeamercolor{frametitle}{bg=PrimaryColor, fg=white}
+\setbeamercolor{title}{bg=PrimaryColor, fg=white}
+\setbeamercolor{block title}{bg=SecondaryColor, fg=white}
+\setbeamercolor{block body}{bg=LightGrey, fg=black}
+
+\setbeamertemplate{footline}{
+   \leavevmode%
+   \hbox{%
+   \begin{beamercolorbox}[wd=.5\paperwidth,ht=2.25ex,dp=1ex,left]{title in head/foot}%
+     \hspace*{2ex}\usebeamerfont{title in head/foot}\insertshorttitle
+   \end{beamercolorbox}%
+   \begin{beamercolorbox}[wd=.5\paperwidth,ht=2.25ex,dp=1ex,right]{date in head/foot}%
+     \usebeamerfont{date in head/foot}\insertframenumber{} / \inserttotalframenumber\hspace*{2ex}
+   \end{beamercolorbox}}%
+   \vskip0pt%
+}
+
+\title[Bagged Expert Ensembles]{Heterogeneous Experts and Validation-Based Selection}
+\author{Arsalan Jawed}
+\institute{University of Hildesheim}
+\date{\today}
+
+\begin{document}
+
+% =====================================================================
+\begin{frame}{Question 4: Do Diverse Experts, Chosen on Validation, Beat Averaging?}
+    \small
+    \textbf{Test:} 6 benchmarks, 5 seeds, trained to convergence. Every expert draws its own
+    depth, dropout, learning rate, weight decay and PLR $\sigma$ at random; each trains
+    independently; greedy selection\,{\scriptsize[Caruana 2004]} rebuilds the ensemble each
+    epoch from \textbf{validation} predictions.
+    \vspace{0.1cm}
+    \begin{table}
+        \centering
+        \renewcommand{\arraystretch}{1.12}
+        \footnotesize
+        \begin{tabular}{l | c | c | l}
+            \rowcolor{PrimaryColor} \color{white}\textbf{Dataset} & \color{white}\textbf{Averaging} & \color{white}\textbf{Diverse + selection} & \color{white}\textbf{Better} \\
+            California Housing (RMSE$\downarrow$) & 0.4796 & \textbf{0.4678} & tie ($p=0.26$) \\
+            \rowcolor{LightGrey} Adult (accuracy$\uparrow$) & 0.8594 & \textbf{0.8675} & selection ($p=0.002$) \\
+            Jannis (accuracy$\uparrow$) & 0.7194 & \textbf{0.7224} & selection ($p=0.019$) \\
+            \rowcolor{LightGrey} Higgs Small (accuracy$\uparrow$) & \textbf{0.7250} & 0.7199 & averaging ($p=0.041$) \\
+            YearPredictionMSD (RMSE$\downarrow$) & \textbf{8.8247} & 8.8268 & tie ($p=0.90$) \\
+            \rowcolor{LightGrey} Covertype (accuracy$\uparrow$) & \textbf{0.9488} & 0.8714 & averaging ($p<0.001$) \\
+        \end{tabular}
+    \end{table}
+    \vspace{-0.1cm}
+    \textbf{Result:} 2 wins, 2 losses, 2 ties. Pooled over all 30 pairs, \textbf{Wilcoxon $p=0.58$}
+    --- \textbf{no general improvement}, and the pre-registered rule returns \emph{size-dependent}.
+    Cost: $2.9\times$ the parameters, $3.6\times$ the training time.\\[0.1cm]
+    \tiny Averaging here is the current v4 (mean-pool + PLR, 5 seeds, trained to convergence), so it is
+    stronger than the 60-epoch, no-PLR baseline used in the earlier attention comparison.
+\end{frame}
+
+% =====================================================================
+\begin{frame}{What Actually Worked: Selecting on Validation, Not Learning Weights}
+    \small
+    Earlier experiments tried attention, softmax, sigmoid and Gumbel weighting. All learned their
+    weights on \textbf{training} data, jointly with the experts, and all failed. Greedy selection
+    differs in one respect: it uses \textbf{held-out validation} data and only decides
+    \emph{include} or \emph{exclude}.
+    \vspace{0.15cm}
+    \begin{table}
+        \centering
+        \renewcommand{\arraystretch}{1.12}
+        \footnotesize
+        \begin{tabular}{l | c | c | c | c}
+            \rowcolor{PrimaryColor} \color{white}\textbf{Dataset} & \color{white}\textbf{Average all 16} & \color{white}\textbf{Selected} & \color{white}\textbf{Gain} & \color{white}\textbf{Experts kept} \\
+            California Housing (RMSE$\downarrow$) & 0.5196 & \textbf{0.4678} & $+9.97\%$ & 6.6 / 16 \\
+            \rowcolor{LightGrey} Adult (accuracy$\uparrow$) & 0.8652 & \textbf{0.8675} & $+0.27\%$ & 5.0 / 16 \\
+            Jannis (accuracy$\uparrow$) & 0.7074 & \textbf{0.7224} & $+2.13\%$ & 6.8 / 16 \\
+            \rowcolor{LightGrey} Higgs Small (accuracy$\uparrow$) & 0.7122 & \textbf{0.7199} & $+1.07\%$ & 5.8 / 16 \\
+            YearPredictionMSD (RMSE$\downarrow$) & 8.9444 & \textbf{8.8268} & $+1.31\%$ & 7.2 / 16 \\
+            \rowcolor{LightGrey} Covertype (accuracy$\uparrow$) & 0.8414 & \textbf{0.8714} & $+3.57\%$ & 6.0 / 16 \\
+        \end{tabular}
+    \end{table}
+    \vspace{-0.1cm}
+    \begin{block}{Finding}
+        Selection wins on \textbf{6 of 6} datasets and \textbf{30 of 30} individual runs
+        (pooled Wilcoxon $p<0.0001$), and it discards roughly \textbf{two thirds} of the experts.
+        Held-out selection succeeds exactly where training-time weighting failed.
+    \end{block}
+\end{frame}
+
+\end{document}

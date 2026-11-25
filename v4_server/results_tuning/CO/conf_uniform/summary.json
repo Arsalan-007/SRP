@@ -1,0 +1,39 @@
+{
+  "dataset": "CO",
+  "label": "Covertype",
+  "arm": "conf_uniform",
+  "task": "multiclass",
+  "metric": "acc",
+  "higher_is_better": true,
+  "mean": 0.9686204314862783,
+  "std": 0.0010182245768587882,
+  "per_seed": [
+    0.9683054654354879,
+    0.9696995774635767,
+    0.9694241973098802,
+    0.9685464230699724,
+    0.9671264941524745
+  ],
+  "n_parameters": 681530,
+  "best_params": {
+    "num_learners": 9,
+    "hidden_dim": 361,
+    "embed_dim": 32,
+    "depth": 3,
+    "feature_frac": 0.9929549569371385,
+    "dropout": 0.1686430842370862,
+    "lr": 0.0017640495290101022,
+    "weight_decay": 6.83284184403381e-05,
+    "shared": true,
+    "head_hidden": 47,
+    "head_depth": 1,
+    "embedding_mode": "periodic",
+    "d_embedding": 16,
+    "n_frequencies": 32,
+    "sigma": 0.9180468874406522
+  },
+  "n_trials": 120,
+  "best_val_loss": 0.08469223510868688,
+  "search_minutes": 638.931807076931,
+  "final_minutes": 37.15091327826182
+}

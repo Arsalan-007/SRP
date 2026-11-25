@@ -1,0 +1,35 @@
+15:22:34 device cuda | 3 workers x 2 threads | 4 datasets x 1 arms = 400 trials
+15:22:34 space: WIDE (hidden<=512) | shared weights searched | final 5 seeds x 200 epochs | log results/tuning/tune_all_20261123_152234.log
+15:22:34 === CA ===
+[I 2026-11-23 15:22:34,647] A new study created in Journal with name: CA_conf_uniform
+15:22:34   CA/conf_uniform: California Housing | 13,209 train rows | 8 features | regression | 0 trials done, 120 to go
+15:36:30   CA/conf_uniform: search 13.9 min | {'PRUNED': 65, 'COMPLETE': 55} | best val loss 0.1658
+15:38:09   CA/conf_uniform: DONE rmse 0.4634 +/- 0.0075 (206,033 params, final 1.7 min)
+15:38:09 === AD ===
+[I 2026-11-23 15:38:09,803] A new study created in Journal with name: AD_conf_uniform
+15:38:09   AD/conf_uniform: Adult | 26,048 train rows | 108 features | binary | 0 trials done, 120 to go
+/media/homes/latif/SRP/v4/training.py:55: UserWarning: The given NumPy array is not writable, and PyTorch does not support non-writable tensors. This means writing to this tensor will result in undefined behavior. You may want to copy the array to protect its data or make it writable before converting it to a tensor. This type of warning will be suppressed for the rest of this program. (Triggered internally at /__w/pytorch/pytorch/torch/csrc/utils/tensor_numpy.cpp:213.)
+  return {k: torch.as_tensor(np.ascontiguousarray(v)).to(dev) for k, v in arrays.items()}
+/media/homes/latif/SRP/v4/training.py:55: UserWarning: The given NumPy array is not writable, and PyTorch does not support non-writable tensors. This means writing to this tensor will result in undefined behavior. You may want to copy the array to protect its data or make it writable before converting it to a tensor. This type of warning will be suppressed for the rest of this program. (Triggered internally at /__w/pytorch/pytorch/torch/csrc/utils/tensor_numpy.cpp:213.)
+  return {k: torch.as_tensor(np.ascontiguousarray(v)).to(dev) for k, v in arrays.items()}
+/media/homes/latif/SRP/v4/training.py:55: UserWarning: The given NumPy array is not writable, and PyTorch does not support non-writable tensors. This means writing to this tensor will result in undefined behavior. You may want to copy the array to protect its data or make it writable before converting it to a tensor. This type of warning will be suppressed for the rest of this program. (Triggered internally at /__w/pytorch/pytorch/torch/csrc/utils/tensor_numpy.cpp:213.)
+  return {k: torch.as_tensor(np.ascontiguousarray(v)).to(dev) for k, v in arrays.items()}
+15:48:53   AD/conf_uniform: search 10.7 min | {'COMPLETE': 117, 'PRUNED': 3} | best val loss 0.2965
+15:49:32   AD/conf_uniform: DONE acc 0.8637 +/- 0.0018 (245,316 params, final 0.6 min)
+15:49:32 === HI ===
+[I 2026-11-23 15:49:32,852] A new study created in Journal with name: HI_conf_uniform
+15:49:32   HI/conf_uniform: Higgs Small | 62,751 train rows | 28 features | binary | 0 trials done, 100 to go
+16:18:59   HI/conf_uniform: search 29.4 min | {'COMPLETE': 66, 'PRUNED': 36} | best val loss 0.5274
+16:22:08   HI/conf_uniform: DONE acc 0.7211 +/- 0.0017 (84,411 params, final 3.2 min)
+16:22:08 === SA ===
+[I 2026-11-23 16:22:19,338] A new study created in Journal with name: SA_conf_uniform
+16:22:19   SA/conf_uniform: Santander | 128,000 train rows | 200 features | binary | 0 trials done, 60 to go
+16:44:40   SA/conf_uniform: search 22.4 min | {'COMPLETE': 60} | best val loss 0.2026
+16:48:40   SA/conf_uniform: DONE acc 0.9239 +/- 0.0002 (296,077 params, final 4.0 min)
+16:48:40 
+wrote results/tuning/summary_CA_AD_HI_SA.csv
+dataset              label          arm       task metric  higher_is_better     mean      std  n_parameters  n_trials  best_val_loss  search_minutes  final_minutes
+     CA California Housing conf_uniform regression   rmse             False 0.463402 0.007547        206033       120       0.165763       13.917089       1.654640
+     AD              Adult conf_uniform     binary    acc              True 0.863706 0.001828        245316       120       0.296535       10.720779       0.648622
+     HI        Higgs Small conf_uniform     binary    acc              True 0.721091 0.001745         84411       102       0.527350       29.444804       3.152956
+     SA          Santander conf_uniform     binary    acc              True 0.923890 0.000228        296077        60       0.202604       22.353807       3.994046

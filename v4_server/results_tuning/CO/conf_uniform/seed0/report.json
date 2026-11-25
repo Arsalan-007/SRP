@@ -1,0 +1,43 @@
+{
+  "dataset": "CO",
+  "label": "Covertype",
+  "arm": "conf_uniform",
+  "seed": 0,
+  "source": "reproduced",
+  "source_ref": "tune_all.py (Optuna-tuned)",
+  "config": {
+    "best_params": {
+      "num_learners": 9,
+      "hidden_dim": 361,
+      "embed_dim": 32,
+      "depth": 3,
+      "feature_frac": 0.9929549569371385,
+      "dropout": 0.1686430842370862,
+      "lr": 0.0017640495290101022,
+      "weight_decay": 6.83284184403381e-05,
+      "shared": true,
+      "head_hidden": 47,
+      "head_depth": 1,
+      "embedding_mode": "periodic",
+      "d_embedding": 16,
+      "n_frequencies": 32,
+      "sigma": 0.9180468874406522
+    },
+    "wide": true,
+    "search_shared": true,
+    "trials": 120,
+    "epochs": 200,
+    "patience": 20
+  },
+  "n_parameters": 681530,
+  "metrics": {
+    "test": {
+      "acc": 0.9683054654354879
+    }
+  },
+  "champion_metric": "test_acc",
+  "champion_value": 0.9683054654354879,
+  "higher_is_better": true,
+  "time_seconds": 1028.863687992096,
+  "checkpoint": null
+}

@@ -1,0 +1,40 @@
+{
+  "dataset": "CA",
+  "label": "California Housing",
+  "arm": "conf_uniform",
+  "seed": 1,
+  "source": "reproduced",
+  "source_ref": "tune_all.py (Optuna-tuned)",
+  "config": {
+    "best_params": {
+      "num_learners": 48,
+      "hidden_dim": 74,
+      "embed_dim": 32,
+      "depth": 1,
+      "feature_frac": 0.5558496362777133,
+      "dropout": 0.06377391562398729,
+      "lr": 0.0017155596258977216,
+      "weight_decay": 1.2338137745179021e-06,
+      "shared": true,
+      "head_hidden": 400,
+      "head_depth": 2,
+      "embedding_mode": "linear",
+      "d_embedding": 16
+    },
+    "wide": true,
+    "search_shared": true,
+    "trials": 120,
+    "final_epochs": 200
+  },
+  "n_parameters": 206033,
+  "metrics": {
+    "test": {
+      "rmse": 0.4530625483618859
+    }
+  },
+  "champion_metric": "test_rmse",
+  "champion_value": 0.4530625483618859,
+  "higher_is_better": false,
+  "time_seconds": 80.46365022659302,
+  "checkpoint": null
+}
